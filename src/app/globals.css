@@ -1,0 +1,271 @@
+@import 'tailwindcss';
+
+:root {
+  --background: #05080a;
+  --foreground: #e0e6eb;
+  --accent: #00d4aa;
+  --accent-dim: #00d4aa40;
+  --danger: #ff4757;
+  --warning: #ffa502;
+  --panel-bg: rgba(10, 18, 24, 0.85);
+  --panel-border: rgba(0, 212, 170, 0.15);
+  --grid-color: rgba(0, 212, 170, 0.03);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  min-height: 100vh;
+}
+
+/* Grid background */
+.grid-bg {
+  background-image:
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Tactical panel with HUD corners */
+.tactical-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  position: relative;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.tactical-panel::before,
+.tactical-panel::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: var(--accent);
+  border-style: solid;
+  opacity: 0.6;
+}
+
+.tactical-panel::before {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+}
+
+.tactical-panel::after {
+  top: -1px;
+  right: -1px;
+  border-width: 2px 2px 0 0;
+}
+
+.tactical-panel-bottom::before,
+.tactical-panel-bottom::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: var(--accent);
+  border-style: solid;
+  opacity: 0.6;
+}
+
+.tactical-panel-bottom::before {
+  bottom: -1px;
+  left: -1px;
+  border-width: 0 0 2px 2px;
+}
+
+.tactical-panel-bottom::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 2px 2px 0;
+}
+
+/* Status indicator pulse */
+.status-live {
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--accent); }
+  50% { opacity: 0.5; box-shadow: 0 0 16px var(--accent); }
+}
+
+/* Data glow effect */
+.data-glow {
+  text-shadow: 0 0 10px var(--accent-dim);
+}
+
+/* Tactical label */
+.tactical-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Map container */
+.map-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.map-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid var(--panel-border);
+  border-radius: inherit;
+  box-shadow: inset 0 0 60px rgba(0, 212, 170, 0.05);
+}
+
+/* MapLibre overrides */
+.maplibregl-popup-content {
+  background: rgba(10, 18, 24, 0.95) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 212, 170, 0.2) !important;
+  border-radius: 8px !important;
+  padding: 16px !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5) !important;
+  color: white !important;
+  font-family: ui-monospace, monospace !important;
+}
+
+.maplibregl-popup-close-button {
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-size: 18px !important;
+  padding: 4px 8px !important;
+}
+
+.maplibregl-popup-close-button:hover {
+  color: white !important;
+  background: transparent !important;
+}
+
+.maplibregl-popup-tip {
+  border-top-color: rgba(10, 18, 24, 0.95) !important;
+}
+
+.maplibregl-ctrl-group {
+  background: rgba(10, 18, 24, 0.9) !important;
+  border: 1px solid rgba(0, 212, 170, 0.15) !important;
+  border-radius: 6px !important;
+}
+
+.maplibregl-ctrl-group button {
+  background: transparent !important;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background: rgba(0, 212, 170, 0.1) !important;
+}
+
+.maplibregl-ctrl-group button span {
+  filter: invert(1) !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 170, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 170, 0.3);
+}
+
+/* District markers on map */
+.district-marker {
+  pointer-events: none;
+}
+
+.district-marker-content {
+  background: rgba(5, 8, 10, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--tier-color, #00d4aa);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: ui-monospace, monospace;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.district-marker-content::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid var(--tier-color, #00d4aa);
+  border-left: 2px solid var(--tier-color, #00d4aa);
+  opacity: 0.8;
+}
+
+.district-marker-content::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid var(--tier-color, #00d4aa);
+  border-right: 2px solid var(--tier-color, #00d4aa);
+  opacity: 0.8;
+}
+
+.marker-name {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.marker-bars {
+  font-size: 11px;
+  letter-spacing: 1px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.marker-price {
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+  line-height: 1;
+}
+
+.marker-meta {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 3px;
+  font-size: 9px;
+}
+
+.marker-listings {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.marker-listings::before {
+  content: '⊞ ';
+  opacity: 0.7;
+}
+
+.marker-change {
+  font-weight: 500;
+}
