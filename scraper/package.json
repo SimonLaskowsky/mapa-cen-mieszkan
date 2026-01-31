@@ -1,0 +1,23 @@
+{
+  "name": "mapa-cen-scraper",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "scrape": "tsx src/index.ts",
+    "scrape:morizon": "tsx src/scrapers/morizon.ts",
+    "scrape:morizon:debug": "tsx src/scrapers/morizon.ts debug",
+    "scrape:morizon:visible": "tsx src/scrapers/morizon.ts scrape warszawa 3 --visible",
+    "aggregate": "tsx src/aggregate.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.93.3",
+    "dotenv": "^17.2.3",
+    "playwright": "^1.52.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0"
+  }
+}

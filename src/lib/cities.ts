@@ -38,9 +38,18 @@ export const CITIES: Record<string, CityConfig> = {
     bounds: [[16.87, 51.03], [17.18, 51.21]],
     districtPropertyName: 'osiedle',
   },
+  katowice: {
+    id: 'katowice',
+    name: 'Katowice',
+    nameShort: 'KTW',
+    center: [19.02, 50.26],
+    zoom: 11.5,
+    bounds: [[18.9, 50.15], [19.15, 50.35]],
+    districtPropertyName: 'name',
+  },
 };
 
-export const CITY_ORDER = ['warsaw', 'krakow', 'wroclaw'];
+export const CITY_ORDER = ['warsaw', 'krakow', 'wroclaw', 'katowice'];
 
 // Check if a point is within a city's bounds
 export function isPointInCity(lng: number, lat: number, city: CityConfig): boolean {

@@ -5,8 +5,15 @@ import dynamic from 'next/dynamic';
 import Legend from '@/components/Legend';
 import StatsPanel from '@/components/StatsPanel';
 import CitySelector from '@/components/CitySelector';
+import AddressSearch from '@/components/AddressSearch';
 import { CITIES } from '@/lib/cities';
-import { CITY_DATA } from '@/lib/city-data';
+import { useDistrictData } from '@/lib/useDistrictData';
+
+interface SearchLocation {
+  lat: number;
+  lng: number;
+  displayName: string;
+}
 
 // Dynamic import for Map to avoid SSR issues with MapLibre
 const Map = dynamic(() => import('@/components/Map'), {
@@ -20,13 +27,22 @@ const Map = dynamic(() => import('@/components/Map'), {
 
 export default function Home() {
   const [currentCity, setCurrentCity] = useState('warsaw');
+  const [searchLocation, setSearchLocation] = useState<SearchLocation | null>(null);
 
   const cityConfig = CITIES[currentCity];
-  const cityData = CITY_DATA[currentCity];
+  const { data: cityData, loading, error, updatedAt } = useDistrictData(currentCity);
 
   // Calculate city-wide stats
   const cityStats = useMemo(() => {
+    if (!cityData) {
+      return { avgPrice: 0, totalListings: 0, avgChange: 0, highest: null, lowest: null, districtCount: 0 };
+    }
+
     const stats = Object.values(cityData.DISTRICT_STATS);
+    if (stats.length === 0) {
+      return { avgPrice: 0, totalListings: 0, avgChange: 0, highest: null, lowest: null, districtCount: 0 };
+    }
+
     const avgPrice = Math.round(stats.reduce((sum, s) => sum + s.avgPriceM2, 0) / stats.length);
     const totalListings = stats.reduce((sum, s) => sum + s.listingCount, 0);
     const avgChange = stats.reduce((sum, s) => sum + s.change30d, 0) / stats.length;
@@ -38,16 +54,22 @@ export default function Home() {
     return { avgPrice, totalListings, avgChange, highest, lowest, districtCount: stats.length };
   }, [cityData]);
 
-  const [now, setNow] = useState(new Date());
+  const [timeString, setTimeString] = useState<string | null>(null);
+  const [dateString, setDateString] = useState<string | null>(null);
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
+    // Only run on client to avoid hydration mismatch
+    const updateTime = () => {
+      const now = new Date();
+      setTimeString(now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      setDateString(now.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' }));
+    };
+
+    updateTime(); // Initial update
+    const interval = setInterval(updateTime, 1000);
 
     return () => clearInterval(interval);
   }, []);
-  const timeString = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const dateString = now.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   return (
     <main className="h-screen flex flex-col bg-[#05080a] grid-bg overflow-hidden">
@@ -63,11 +85,17 @@ export default function Home() {
             <div className="h-4 w-px bg-[#00d4aa20]" />
             <h1 className="font-mono text-lg font-semibold tracking-tight hidden lg:block">
               <span className="text-[#00d4aa]">REAL ESTATE</span>
-              <span className="text-gray-500"> // </span>
+              <span className="text-gray-500">{' // '}</span>
               <span className="text-white">PRICE MONITOR</span>
             </h1>
             <div className="h-4 w-px bg-[#00d4aa20] hidden lg:block" />
-            <CitySelector currentCity={currentCity} onCityChange={setCurrentCity} />
+            <CitySelector
+                currentCity={currentCity}
+                onCityChange={(city) => {
+                  setCurrentCity(city);
+                  setSearchLocation(null);
+                }}
+              />
           </div>
 
           {/* Center - Location */}
@@ -89,12 +117,12 @@ export default function Home() {
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="tactical-label">LOCAL TIME</p>
-              <p className="font-mono text-sm text-white">{timeString}</p>
+              <p className="font-mono text-sm text-white">{timeString ?? '--:--:--'}</p>
             </div>
             <div className="h-8 w-px bg-[#00d4aa20]" />
             <div className="text-right">
               <p className="tactical-label">DATE</p>
-              <p className="font-mono text-sm text-[#00d4aa]">{dateString}</p>
+              <p className="font-mono text-sm text-[#00d4aa]">{dateString ?? '--.--.----'}</p>
             </div>
           </div>
         </div>
@@ -119,9 +147,18 @@ export default function Home() {
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
                 <h2 className="tactical-label">DISTRICT ANALYSIS</h2>
+                {loading && <span className="font-mono text-[10px] text-gray-500 animate-pulse">LOADING...</span>}
               </div>
               <div className="flex-1 overflow-hidden">
-                <StatsPanel cityId={currentCity} />
+                {cityData ? (
+                  <StatsPanel cityData={cityData} />
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <span className="font-mono text-xs text-gray-600">
+                      {loading ? 'Loading...' : 'No data'}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -131,7 +168,31 @@ export default function Home() {
         <div className="flex-1 flex flex-col gap-3">
           {/* Map */}
           <div className="flex-1 relative tactical-panel tactical-panel-bottom rounded-lg overflow-hidden">
-            <Map cityId={currentCity} onCityChange={setCurrentCity} />
+            {loading ? (
+              <div className="w-full h-full flex items-center justify-center bg-[#0a1218]">
+                <div className="text-center">
+                  <div className="text-[#00d4aa] font-mono text-sm animate-pulse">LOADING DATA...</div>
+                  <div className="text-gray-600 font-mono text-xs mt-2">Fetching district statistics</div>
+                </div>
+              </div>
+            ) : error ? (
+              <div className="w-full h-full flex items-center justify-center bg-[#0a1218]">
+                <div className="text-center">
+                  <div className="text-red-400 font-mono text-sm">DATA UNAVAILABLE</div>
+                  <div className="text-gray-600 font-mono text-xs mt-2">{error}</div>
+                </div>
+              </div>
+            ) : cityData ? (
+              <Map
+                cityId={currentCity}
+                cityData={cityData}
+                onCityChange={(city) => {
+                  setCurrentCity(city);
+                  setSearchLocation(null);
+                }}
+                searchLocation={searchLocation}
+              />
+            ) : null}
 
             {/* Map Overlays */}
             <div className="absolute top-3 left-3 flex items-center gap-2">
@@ -139,6 +200,15 @@ export default function Home() {
                 <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
                 <span className="font-mono text-xs text-red-400">LIVE FEED</span>
               </div>
+            </div>
+
+            {/* Address Search */}
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-72">
+              <AddressSearch
+                cityName={cityConfig.name}
+                onLocationFound={setSearchLocation}
+                onClear={() => setSearchLocation(null)}
+              />
             </div>
 
             <div className="absolute top-3 right-12 tactical-panel rounded px-3 py-1.5">
@@ -186,16 +256,28 @@ export default function Home() {
                 <div>
                   <p className="tactical-label">HIGHEST</p>
                   <p className="font-mono text-sm">
-                    <span className="text-red-400">{cityStats.highest.avgPriceM2.toLocaleString('pl-PL')}</span>
-                    <span className="text-gray-500"> {cityStats.highest.district.toUpperCase()}</span>
+                    {cityStats.highest ? (
+                      <>
+                        <span className="text-red-400">{cityStats.highest.avgPriceM2.toLocaleString('pl-PL')}</span>
+                        <span className="text-gray-500"> {cityStats.highest.district.toUpperCase()}</span>
+                      </>
+                    ) : (
+                      <span className="text-gray-500">--</span>
+                    )}
                   </p>
                 </div>
                 <div className="h-8 w-px bg-[#00d4aa20]" />
                 <div>
                   <p className="tactical-label">LOWEST</p>
                   <p className="font-mono text-sm">
-                    <span className="text-green-400">{cityStats.lowest.avgPriceM2.toLocaleString('pl-PL')}</span>
-                    <span className="text-gray-500"> {cityStats.lowest.district.toUpperCase()}</span>
+                    {cityStats.lowest ? (
+                      <>
+                        <span className="text-green-400">{cityStats.lowest.avgPriceM2.toLocaleString('pl-PL')}</span>
+                        <span className="text-gray-500"> {cityStats.lowest.district.toUpperCase()}</span>
+                      </>
+                    ) : (
+                      <span className="text-gray-500">--</span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -209,10 +291,15 @@ export default function Home() {
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-4">
             <span className="tactical-label">SYSTEM STATUS:</span>
-            <span className="font-mono text-[#00d4aa]">OPERATIONAL</span>
+            <span className="font-mono text-[#00d4aa]">{loading ? 'SYNCING' : error ? 'ERROR' : 'OPERATIONAL'}</span>
             <span className="text-gray-600">|</span>
             <span className="tactical-label">LAST SYNC:</span>
-            <span className="font-mono text-gray-400">2 HOURS AGO</span>
+            <span className="font-mono text-gray-400">
+              {updatedAt ? new Date(updatedAt).toLocaleDateString('pl-PL') : 'N/A'}
+            </span>
+            <span className="text-gray-600">|</span>
+            <span className="tactical-label">SOURCE:</span>
+            <span className="font-mono text-[#00d4aa]">MORIZON</span>
           </div>
           <div className="flex items-center gap-4">
             <span className="tactical-label text-gray-600">MAPA CEN MIESZKAŃ v1.0</span>

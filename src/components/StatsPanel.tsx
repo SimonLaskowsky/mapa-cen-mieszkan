@@ -1,18 +1,16 @@
 'use client';
 
-import { CITY_DATA, formatPercent } from '@/lib/city-data';
+import { formatPercent, type CityData } from '@/lib/city-data';
 
 interface StatsPanelProps {
-  cityId: string;
+  cityData: CityData;
 }
 
-export default function StatsPanel({ cityId }: StatsPanelProps) {
-  const cityData = CITY_DATA[cityId];
-
+export default function StatsPanel({ cityData }: StatsPanelProps) {
   // Sort districts by price
-  const sortedDistricts = Object.values(cityData.DISTRICT_STATS).sort(
-    (a, b) => b.avgPriceM2 - a.avgPriceM2
-  );
+  const sortedDistricts = Object.values(cityData.DISTRICT_STATS)
+    .filter(d => d.avgPriceM2 > 0) // Filter out districts with no data
+    .sort((a, b) => b.avgPriceM2 - a.avgPriceM2);
 
   return (
     <div className="h-full flex flex-col">

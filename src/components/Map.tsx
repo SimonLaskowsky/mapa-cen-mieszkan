@@ -4,12 +4,26 @@ import { useEffect, useRef, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { CITIES, findCityAtPoint } from '@/lib/cities';
-import { CITY_DATA, formatPrice, formatPercent, type DistrictStats } from '@/lib/city-data';
+import { formatPrice, formatPercent, type DistrictStats, type CityData } from '@/lib/city-data';
+
+// ============================================
+// FEATURE FLAG: Restrict map panning to city bounds
+// Set to false to allow free scrolling across all cities
+// ============================================
+const RESTRICT_TO_CITY_BOUNDS = true;
+
+interface SearchLocation {
+  lat: number;
+  lng: number;
+  displayName: string;
+}
 
 interface MapProps {
   cityId: string;
+  cityData: CityData;
   onCityChange?: (cityId: string) => void;
   onDistrictSelect?: (district: DistrictStats | null) => void;
+  searchLocation?: SearchLocation | null;
 }
 
 // Get price tier (1-6) for color coding
@@ -51,16 +65,22 @@ function getPriceThreatLevel(price: number): { label: string; color: string } {
   return { label: 'CRITICAL', color: '#dc2626' };
 }
 
-export default function Map({ cityId, onCityChange, onDistrictSelect }: MapProps) {
+export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, searchLocation }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popup = useRef<maplibregl.Popup | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
+  const searchMarkerRef = useRef<maplibregl.Marker | null>(null);
   const currentCityRef = useRef(cityId);
+  const cityDataRef = useRef(cityData);
 
-  // Get current city config and data
+  // Get current city config
   const cityConfig = CITIES[cityId];
-  const cityData = CITY_DATA[cityId];
+
+  // Keep cityData ref updated
+  useEffect(() => {
+    cityDataRef.current = cityData;
+  }, [cityData]);
 
   // Remove existing markers
   const clearMarkers = useCallback(() => {
@@ -138,6 +158,12 @@ export default function Map({ cityId, onCityChange, onDistrictSelect }: MapProps
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
+    // Add padding to bounds so districts at edges aren't cut off
+    const paddedBounds = RESTRICT_TO_CITY_BOUNDS ? [
+      [cityConfig.bounds[0][0] - 0.02, cityConfig.bounds[0][1] - 0.02], // SW with padding
+      [cityConfig.bounds[1][0] + 0.02, cityConfig.bounds[1][1] + 0.02], // NE with padding
+    ] as [[number, number], [number, number]] : undefined;
+
     map.current = new maplibregl.Map({
       container: mapContainer.current,
       style: {
@@ -168,6 +194,7 @@ export default function Map({ cityId, onCityChange, onDistrictSelect }: MapProps
       zoom: cityConfig.zoom,
       minZoom: 8,
       maxZoom: 16,
+      maxBounds: paddedBounds,
     });
 
     map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -304,7 +331,7 @@ export default function Map({ cityId, onCityChange, onDistrictSelect }: MapProps
 
         const feature = e.features[0];
         const name = feature.properties?.name;
-        const currentData = CITY_DATA[currentCityRef.current];
+        const currentData = cityDataRef.current;
         const districtData = currentData.DISTRICT_CENTERS.find(d => d.name === name);
 
         if (!districtData) return;
@@ -364,13 +391,21 @@ export default function Map({ cityId, onCityChange, onDistrictSelect }: MapProps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle city change
+  // Handle city/data change
   useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded()) return;
 
     currentCityRef.current = cityId;
     const config = CITIES[cityId];
-    const data = CITY_DATA[cityId];
+
+    // Update bounds restriction when city changes
+    if (RESTRICT_TO_CITY_BOUNDS) {
+      const paddedBounds: [[number, number], [number, number]] = [
+        [config.bounds[0][0] - 0.02, config.bounds[0][1] - 0.02],
+        [config.bounds[1][0] + 0.02, config.bounds[1][1] + 0.02],
+      ];
+      map.current.setMaxBounds(paddedBounds);
+    }
 
     // Fly to new city
     map.current.flyTo({
@@ -379,12 +414,55 @@ export default function Map({ cityId, onCityChange, onDistrictSelect }: MapProps
       duration: 1500,
     });
 
-    // Update data
-    updateMapData(map.current, data);
+    // Update data with current cityData
+    updateMapData(map.current, cityData);
 
     // Close any open popup
     if (popup.current) popup.current.remove();
-  }, [cityId, updateMapData]);
+  }, [cityId, cityData, updateMapData]);
+
+  // Handle search location marker
+  useEffect(() => {
+    if (!map.current) return;
+
+    // Remove existing search marker
+    if (searchMarkerRef.current) {
+      searchMarkerRef.current.remove();
+      searchMarkerRef.current = null;
+    }
+
+    // Add new marker if location provided
+    if (searchLocation) {
+      // Create tactical marker element with inline styles for reliability
+      const el = document.createElement('div');
+      el.className = 'search-marker';
+      el.style.cssText = 'position: relative; width: 80px; height: 80px; overflow: visible;';
+      el.innerHTML = `
+        <div class="search-marker-ring search-marker-ring-1" style="position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; border: 2px solid #00d4aa; border-radius: 50%; transform: translate(-50%, -50%);"></div>
+        <div class="search-marker-ring search-marker-ring-2" style="position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; border: 2px solid #00d4aa; border-radius: 50%; transform: translate(-50%, -50%);"></div>
+        <div class="search-marker-ring search-marker-ring-3" style="position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; border: 2px solid #00d4aa; border-radius: 50%; transform: translate(-50%, -50%);"></div>
+        <div class="search-marker-crosshair search-marker-crosshair-h" style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #00d4aa; transform: translateY(-50%);"></div>
+        <div class="search-marker-crosshair search-marker-crosshair-v" style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #00d4aa; transform: translateX(-50%);"></div>
+        <div class="search-marker-core" style="position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; background: #00d4aa; transform: translate(-50%, -50%) rotate(45deg); box-shadow: 0 0 10px #00d4aa, 0 0 20px rgba(0,212,170,0.5); z-index: 10;"></div>
+        <div class="search-marker-bracket search-marker-bracket-tl" style="position: absolute; top: 8px; left: 8px; width: 12px; height: 12px; border-top: 2px solid #00d4aa; border-left: 2px solid #00d4aa;"></div>
+        <div class="search-marker-bracket search-marker-bracket-tr" style="position: absolute; top: 8px; right: 8px; width: 12px; height: 12px; border-top: 2px solid #00d4aa; border-right: 2px solid #00d4aa;"></div>
+        <div class="search-marker-bracket search-marker-bracket-bl" style="position: absolute; bottom: 8px; left: 8px; width: 12px; height: 12px; border-bottom: 2px solid #00d4aa; border-left: 2px solid #00d4aa;"></div>
+        <div class="search-marker-bracket search-marker-bracket-br" style="position: absolute; bottom: 8px; right: 8px; width: 12px; height: 12px; border-bottom: 2px solid #00d4aa; border-right: 2px solid #00d4aa;"></div>
+        <div class="search-marker-label" style="position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 8px; background: rgba(5,8,10,0.95); border: 1px solid rgba(0,212,170,0.4); border-radius: 4px; padding: 6px 12px; font-family: ui-monospace, monospace; font-size: 10px; color: #00d4aa; text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap;">TARGET LOCATED</div>
+      `;
+
+      searchMarkerRef.current = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([searchLocation.lng, searchLocation.lat])
+        .addTo(map.current);
+
+      // Fly to location
+      map.current.flyTo({
+        center: [searchLocation.lng, searchLocation.lat],
+        zoom: 15,
+        duration: 1500,
+      });
+    }
+  }, [searchLocation]);
 
   return (
     <div ref={mapContainer} className="map-container w-full h-full" />

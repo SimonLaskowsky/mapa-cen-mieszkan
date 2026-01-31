@@ -269,3 +269,189 @@ body {
 .marker-change {
   font-weight: 500;
 }
+
+/* ========================================
+   TACTICAL SEARCH MARKER - "CIA Style"
+   ======================================== */
+
+/* MapLibre marker wrapper override */
+.maplibregl-marker:has(.search-marker) {
+  overflow: visible !important;
+}
+
+.search-marker {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* Center diamond/square */
+.search-marker-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  background: #00d4aa;
+  transform: translate(-50%, -50%) rotate(45deg);
+  box-shadow:
+    0 0 10px #00d4aa,
+    0 0 20px rgba(0, 212, 170, 0.5),
+    0 0 30px rgba(0, 212, 170, 0.25);
+  animation: markerCorePulse 1.5s ease-in-out infinite;
+  z-index: 10;
+}
+
+@keyframes markerCorePulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) rotate(45deg) scale(1);
+    box-shadow:
+      0 0 10px #00d4aa,
+      0 0 20px rgba(0, 212, 170, 0.5),
+      0 0 30px rgba(0, 212, 170, 0.25);
+  }
+  50% {
+    transform: translate(-50%, -50%) rotate(45deg) scale(1.3);
+    box-shadow:
+      0 0 20px #00d4aa,
+      0 0 40px rgba(0, 212, 170, 0.6),
+      0 0 60px rgba(0, 212, 170, 0.3);
+  }
+}
+
+/* Outer breathing rings */
+.search-marker-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #00d4aa;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.search-marker-ring-1 {
+  animation: markerRingExpand 2s ease-out infinite;
+}
+
+.search-marker-ring-2 {
+  animation: markerRingExpand 2s ease-out infinite 0.66s;
+}
+
+.search-marker-ring-3 {
+  animation: markerRingExpand 2s ease-out infinite 1.33s;
+}
+
+@keyframes markerRingExpand {
+  0% {
+    width: 12px;
+    height: 12px;
+    opacity: 1;
+    border-width: 2px;
+  }
+  100% {
+    width: 80px;
+    height: 80px;
+    opacity: 0;
+    border-width: 1px;
+  }
+}
+
+/* Crosshair lines */
+.search-marker-crosshair {
+  position: absolute;
+  background: #00d4aa;
+}
+
+.search-marker-crosshair-h {
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  transform: translateY(-50%);
+  animation: crosshairPulse 1.5s ease-in-out infinite;
+}
+
+.search-marker-crosshair-v {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
+  animation: crosshairPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes crosshairPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+
+/* Corner brackets */
+.search-marker-bracket {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: #00d4aa;
+  border-style: solid;
+  animation: bracketPulse 1.5s ease-in-out infinite;
+}
+
+.search-marker-bracket-tl {
+  top: 8px;
+  left: 8px;
+  border-width: 2px 0 0 2px;
+}
+
+.search-marker-bracket-tr {
+  top: 8px;
+  right: 8px;
+  border-width: 2px 2px 0 0;
+}
+
+.search-marker-bracket-bl {
+  bottom: 8px;
+  left: 8px;
+  border-width: 0 0 2px 2px;
+}
+
+.search-marker-bracket-br {
+  bottom: 8px;
+  right: 8px;
+  border-width: 0 2px 2px 0;
+}
+
+@keyframes bracketPulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* Label below marker */
+.search-marker-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  background: rgba(5, 8, 10, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 212, 170, 0.4);
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  color: #00d4aa;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+}
