@@ -1,12 +1,21 @@
 'use client';
 
 import { formatPercent, type CityData } from '@/lib/city-data';
+import TrendChart from './TrendChart';
+import ListingsPanel from './ListingsPanel';
 
 interface StatsPanelProps {
   cityData: CityData;
+  citySlug: string;
+  selectedDistrict: string | null;
+  onDistrictSelect: (district: string | null) => void;
 }
 
-export default function StatsPanel({ cityData }: StatsPanelProps) {
+export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDistrictSelect }: StatsPanelProps) {
+  const handleDistrictClick = (districtName: string) => {
+    const newSelected = selectedDistrict === districtName ? null : districtName;
+    onDistrictSelect(newSelected);
+  };
   // Sort districts by price
   const sortedDistricts = Object.values(cityData.DISTRICT_STATS)
     .filter(d => d.avgPriceM2 > 0) // Filter out districts with no data
@@ -23,16 +32,19 @@ export default function StatsPanel({ cityData }: StatsPanelProps) {
       </div>
 
       {/* District list */}
-      <div className="flex-1 overflow-y-auto space-y-0.5 pr-1">
+      <div className="flex-1 overflow-y-auto space-y-0.5 pr-1 min-h-[150px]">
         {sortedDistricts.map((district, index) => {
           const isHot = district.change30d > 2;
           const isCold = district.change30d < 0;
           const changeColor = district.change30d >= 0 ? 'text-red-400' : 'text-green-400';
 
+          const isSelected = selectedDistrict === district.district;
+
           return (
             <div
               key={district.district}
-              className="flex items-center gap-2 py-1.5 px-1 rounded hover:bg-[#00d4aa08] transition-colors cursor-pointer group"
+              onClick={() => handleDistrictClick(district.district)}
+              className={`flex items-center gap-2 py-1.5 px-1 rounded hover:bg-[#00d4aa08] transition-colors cursor-pointer group ${isSelected ? 'bg-[#00d4aa15] border-l-2 border-[#00d4aa]' : ''}`}
             >
               <span className="font-mono text-[10px] text-gray-600 w-6">
                 {String(index + 1).padStart(2, '0')}
@@ -58,6 +70,22 @@ export default function StatsPanel({ cityData }: StatsPanelProps) {
           );
         })}
       </div>
+
+      {/* Trend Chart & Listings */}
+      {selectedDistrict && (
+        <div className="pt-3 mt-3 border-t border-[#00d4aa15] space-y-3">
+          <TrendChart
+            city={citySlug}
+            district={selectedDistrict}
+            onClose={() => onDistrictSelect(null)}
+          />
+          <ListingsPanel
+            city={citySlug}
+            district={selectedDistrict}
+            onClose={() => onDistrictSelect(null)}
+          />
+        </div>
+      )}
 
       {/* Footer */}
       <div className="pt-2 mt-2 border-t border-[#00d4aa10]">

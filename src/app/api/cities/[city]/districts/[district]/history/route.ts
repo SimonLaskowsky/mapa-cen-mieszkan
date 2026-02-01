@@ -1,21 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
-import type { DistrictStats } from '@/types/database';
 
 interface RouteParams {
   params: Promise<{ city: string; district: string }>;
 }
 
-type HistoryRow = Pick<
-  DistrictStats,
-  'date' | 'avg_price_m2' | 'median_price_m2' | 'listing_count' | 'new_listings'
->;
+interface DistrictStatsRow {
+  date: string;
+  avg_price_m2: number | null;
+  median_price_m2: number | null;
+  listing_count: number | null;
+}
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { city, district } = await params;
     const { searchParams } = new URL(request.url);
-    const months = parseInt(searchParams.get('months') || '12', 10);
+    const months = parseInt(searchParams.get('months') || '6', 10);
 
     const supabase = createServerClient();
 
@@ -26,45 +27,45 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { data, error } = await supabase
       .from('district_stats')
-      .select('date, avg_price_m2, median_price_m2, listing_count, new_listings')
+      .select('date, avg_price_m2, median_price_m2, listing_count')
       .eq('city', city.toLowerCase())
-      .eq('district', decodeURIComponent(district).toLowerCase())
+      .eq('district', district.toLowerCase())
       .gte('date', startDate.toISOString().split('T')[0])
       .lte('date', endDate.toISOString().split('T')[0])
-      .order('date', { ascending: true })
-      .returns<HistoryRow[]>();
+      .order('date', { ascending: true });
 
     if (error) {
       console.error('Error fetching history:', error);
       return NextResponse.json({ error: 'Failed to fetch history' }, { status: 500 });
     }
 
-    // Transform data for charts
-    const history = data?.map((d) => ({
-      date: d.date,
-      avgPriceM2: d.avg_price_m2,
-      medianPriceM2: d.median_price_m2,
-      listingCount: d.listing_count,
-      newListings: d.new_listings,
-    }));
+    // Transform data for chart
+    const history = (data as DistrictStatsRow[] | null)?.map((row) => ({
+      date: row.date,
+      avgPriceM2: row.avg_price_m2,
+      medianPriceM2: row.median_price_m2,
+      listingCount: row.listing_count,
+    })) || [];
 
-    // Calculate trends
-    const firstPrice = history?.[0]?.avgPriceM2;
-    const lastPrice = history?.[history.length - 1]?.avgPriceM2;
-    const changePercent =
-      firstPrice && lastPrice ? ((lastPrice - firstPrice) / firstPrice) * 100 : null;
+    // Calculate trend (compare first and last data points)
+    let trend = null;
+    if (history.length >= 2) {
+      const first = history[0].avgPriceM2;
+      const last = history[history.length - 1].avgPriceM2;
+      if (first && last) {
+        trend = {
+          changePercent: ((last - first) / first) * 100,
+          changeAbsolute: last - first,
+        };
+      }
+    }
 
     return NextResponse.json({
       city,
-      district: decodeURIComponent(district),
-      months,
-      history: history || [],
-      summary: {
-        startPrice: firstPrice,
-        endPrice: lastPrice,
-        changePercent: changePercent ? Math.round(changePercent * 100) / 100 : null,
-        dataPoints: history?.length || 0,
-      },
+      district,
+      history,
+      trend,
+      dataPoints: history.length,
     });
   } catch (error) {
     console.error('Unexpected error:', error);

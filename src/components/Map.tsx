@@ -1,16 +1,36 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { CITIES, findCityAtPoint } from '@/lib/cities';
 import { formatPrice, formatPercent, type DistrictStats, type CityData } from '@/lib/city-data';
+
+interface Listing {
+  id: string;
+  lat: number;
+  lng: number;
+  price: number;
+  sizeM2: number;
+  pricePerM2: number;
+  rooms: number | null;
+  address: string | null;
+  url: string;
+}
 
 // ============================================
 // FEATURE FLAG: Restrict map panning to city bounds
 // Set to false to allow free scrolling across all cities
 // ============================================
 const RESTRICT_TO_CITY_BOUNDS = true;
+
+// Map frontend city IDs to API slugs
+const CITY_API_SLUGS: Record<string, string> = {
+  warsaw: 'warszawa',
+  krakow: 'krakow',
+  wroclaw: 'wroclaw',
+  katowice: 'katowice',
+};
 
 interface SearchLocation {
   lat: number;
@@ -24,6 +44,11 @@ interface MapProps {
   onCityChange?: (cityId: string) => void;
   onDistrictSelect?: (district: DistrictStats | null) => void;
   searchLocation?: SearchLocation | null;
+  focusedDistrict?: string | null;
+  onDistrictClick?: (district: string | null) => void;
+  showListings?: boolean;
+  showDistrictLabels?: boolean;
+  showHeatmap?: boolean;
 }
 
 // Get price tier (1-6) for color coding
@@ -65,28 +90,139 @@ function getPriceThreatLevel(price: number): { label: string; color: string } {
   return { label: 'CRITICAL', color: '#dc2626' };
 }
 
-export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, searchLocation }: MapProps) {
+export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, searchLocation, focusedDistrict, onDistrictClick, showListings = true, showDistrictLabels = true, showHeatmap = true }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popup = useRef<maplibregl.Popup | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
+  const listingMarkersRef = useRef<maplibregl.Marker[]>([]);
   const searchMarkerRef = useRef<maplibregl.Marker | null>(null);
   const currentCityRef = useRef(cityId);
   const cityDataRef = useRef(cityData);
+  const onDistrictClickRef = useRef(onDistrictClick);
+  const [listings, setListings] = useState<Listing[]>([]);
 
   // Get current city config
   const cityConfig = CITIES[cityId];
 
-  // Keep cityData ref updated
+  // Keep refs updated
   useEffect(() => {
     cityDataRef.current = cityData;
   }, [cityData]);
+
+  useEffect(() => {
+    onDistrictClickRef.current = onDistrictClick;
+  }, [onDistrictClick]);
 
   // Remove existing markers
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
   }, []);
+
+  // Remove listing markers
+  const clearListingMarkers = useCallback(() => {
+    listingMarkersRef.current.forEach(marker => marker.remove());
+    listingMarkersRef.current = [];
+  }, []);
+
+  // Add listing markers to map
+  const addListingMarkers = useCallback((mapInstance: maplibregl.Map, listingsData: Listing[]) => {
+    clearListingMarkers();
+
+    listingsData.forEach((listing, index) => {
+      const priceK = Math.round(listing.price / 1000);
+      const priceM2K = (listing.pricePerM2 / 1000).toFixed(1);
+
+      const el = document.createElement('div');
+      el.className = 'listing-marker';
+      el.style.cssText = `
+        width: 0;
+        height: 0;
+        cursor: pointer;
+        z-index: ${100 + index};
+      `;
+      el.innerHTML = `
+        <div class="listing-marker-dot" style="
+          position: absolute;
+          top: -7px;
+          left: -7px;
+          width: 10px;
+          height: 10px;
+          background: #00d4aa;
+          border: 2px solid #05080a;
+          transform: rotate(45deg);
+          box-shadow: 0 0 8px rgba(0,212,170,0.6);
+          transition: all 0.2s ease;
+          transform-origin: center;
+        "></div>
+        <div class="listing-marker-pulse" style="
+          position: absolute;
+          top: -14px;
+          left: -14px;
+          width: 24px;
+          height: 24px;
+          border: 1px solid rgba(0,212,170,0.4);
+          border-radius: 50%;
+          animation: listing-pulse 2s ease-out infinite;
+          animation-delay: ${index * 0.1}s;
+          pointer-events: none;
+        "></div>
+        <div class="listing-marker-tooltip" style="
+          position: absolute;
+          bottom: 12px;
+          left: 0;
+          transform: translateX(-50%);
+          background: rgba(5,8,10,0.95);
+          border: 1px solid rgba(0,212,170,0.5);
+          border-radius: 4px;
+          padding: 6px 10px;
+          font-family: ui-monospace, monospace;
+          font-size: 10px;
+          white-space: nowrap;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.2s ease;
+        ">
+          <div style="color: #00d4aa; font-weight: 600;">${priceK}K PLN</div>
+          <div style="color: rgba(255,255,255,0.6); margin-top: 2px;">${listing.sizeM2}m² · ${priceM2K}K/m²</div>
+          ${listing.rooms ? `<div style="color: rgba(255,255,255,0.4);">${listing.rooms} rooms</div>` : ''}
+        </div>
+      `;
+
+      // Hover effects
+      el.addEventListener('mouseenter', () => {
+        const tooltip = el.querySelector('.listing-marker-tooltip') as HTMLElement;
+        const dot = el.querySelector('.listing-marker-dot') as HTMLElement;
+        if (tooltip) tooltip.style.opacity = '1';
+        if (dot) {
+          dot.style.transform = 'rotate(45deg) scale(1.5)';
+          dot.style.boxShadow = '0 0 15px rgba(0,212,170,0.9)';
+        }
+      });
+      el.addEventListener('mouseleave', () => {
+        const tooltip = el.querySelector('.listing-marker-tooltip') as HTMLElement;
+        const dot = el.querySelector('.listing-marker-dot') as HTMLElement;
+        if (tooltip) tooltip.style.opacity = '0';
+        if (dot) {
+          dot.style.transform = 'rotate(45deg) scale(1)';
+          dot.style.boxShadow = '0 0 8px rgba(0,212,170,0.6)';
+        }
+      });
+
+      // Click opens listing URL
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.open(listing.url, '_blank');
+      });
+
+      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([listing.lng, listing.lat])
+        .addTo(mapInstance);
+
+      listingMarkersRef.current.push(marker);
+    });
+  }, [clearListingMarkers]);
 
   // Add markers for districts
   const addMarkers = useCallback((mapInstance: maplibregl.Map, data: typeof cityData) => {
@@ -379,11 +515,13 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
 
         popup.current.setLngLat(coordinates).setHTML(html).addTo(map.current);
         onDistrictSelect?.(stats);
+        onDistrictClickRef.current?.(name);
       });
     });
 
     return () => {
       clearMarkers();
+      clearListingMarkers();
       if (popup.current) popup.current.remove();
       if (map.current) map.current.remove();
       map.current = null;
@@ -417,9 +555,12 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
     // Update data with current cityData
     updateMapData(map.current, cityData);
 
-    // Close any open popup
+    // Close any open popup and clear listing markers/heatmap
     if (popup.current) popup.current.remove();
-  }, [cityId, cityData, updateMapData]);
+    clearListingMarkers();
+    if (map.current.getLayer('listings-heat')) map.current.removeLayer('listings-heat');
+    if (map.current.getSource('listings-data')) map.current.removeSource('listings-data');
+  }, [cityId, cityData, updateMapData, clearListingMarkers]);
 
   // Handle search location marker
   useEffect(() => {
@@ -463,6 +604,178 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
       });
     }
   }, [searchLocation]);
+
+  // Handle focused district from panel click
+  useEffect(() => {
+    if (!map.current || !popup.current || !focusedDistrict) return;
+
+    const currentData = cityDataRef.current;
+    const districtData = currentData.DISTRICT_CENTERS.find(d => d.name === focusedDistrict);
+
+    if (!districtData) return;
+
+    const stats = districtData.stats;
+    const coordinates: [number, number] = [districtData.lng, districtData.lat];
+    const tier = getPriceTier(stats.avgPriceM2);
+    const tierColor = getTierColor(tier);
+    const displayName = districtData.displayName || districtData.name;
+
+    const changeColor = stats.change30d >= 0 ? '#ef4444' : '#22c55e';
+    const changeIcon = stats.change30d >= 0 ? '▲' : '▼';
+    const threatLevel = getPriceThreatLevel(stats.avgPriceM2);
+
+    const html = `
+      <div style="font-family: ui-monospace, monospace;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid ${tierColor}40;">
+          <span style="font-size: 14px; font-weight: 600; color: white;">${displayName.toUpperCase()}</span>
+          <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${tierColor}20; color: ${tierColor}; border: 1px solid ${tierColor}40;">${threatLevel.label}</span>
+        </div>
+        <div style="display: grid; gap: 8px; font-size: 12px;">
+          <div style="display: flex; justify-content: space-between; gap: 4px;">
+            <span style="color: rgba(255,255,255,0.5);">AVG PRICE/M²</span>
+            <span style="color: ${tierColor}; font-weight: 600;">${formatPrice(stats.avgPriceM2)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; gap: 4px;">
+            <span style="color: rgba(255,255,255,0.5);">MEDIAN</span>
+            <span style="color: white;">${formatPrice(stats.medianPriceM2)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; gap: 4px;">
+            <span style="color: rgba(255,255,255,0.5);">30D CHANGE</span>
+            <span style="color: ${changeColor};">${changeIcon} ${formatPercent(stats.change30d)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; gap: 4px;">
+            <span style="color: rgba(255,255,255,0.5);">LISTINGS</span>
+            <span style="color: white;">${stats.listingCount}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; gap: 4px;">
+            <span style="color: rgba(255,255,255,0.5);">AVG SIZE</span>
+            <span style="color: white;">${stats.avgSize} m²</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Fly to district
+    map.current.flyTo({
+      center: coordinates,
+      zoom: 13,
+      duration: 1000,
+    });
+
+    // Show popup after fly animation
+    setTimeout(() => {
+      if (map.current && popup.current) {
+        popup.current.setLngLat(coordinates).setHTML(html).addTo(map.current);
+      }
+    }, 500);
+
+    onDistrictSelect?.(stats);
+  }, [focusedDistrict, onDistrictSelect]);
+
+  // Fetch and display listing markers + heatmap when district is selected
+  useEffect(() => {
+    if (!map.current) return;
+
+    // Clear existing listing markers when district changes
+    clearListingMarkers();
+
+    // Remove existing heatmap layer and source
+    if (map.current.getLayer('listings-heat')) {
+      map.current.removeLayer('listings-heat');
+    }
+    if (map.current.getSource('listings-data')) {
+      map.current.removeSource('listings-data');
+    }
+
+    if (!focusedDistrict) {
+      setListings([]);
+      return;
+    }
+
+    const citySlug = CITY_API_SLUGS[cityId] || cityId;
+    const currentData = cityDataRef.current;
+    const districtStats = currentData.DISTRICT_STATS[focusedDistrict];
+    const tierColor = districtStats ? getTierColor(getPriceTier(districtStats.avgPriceM2)) : '#00d4aa';
+
+    const fetchListings = async () => {
+      try {
+        const response = await fetch(`/api/listings?city=${citySlug}&district=${focusedDistrict}&limit=100`);
+        if (!response.ok) throw new Error('Failed to fetch');
+        const data = await response.json();
+        const listingsWithCoords = (data.listings || []).filter((l: Listing) => l.lat && l.lng);
+        setListings(listingsWithCoords);
+
+        if (map.current && listingsWithCoords.length > 0) {
+          if (showListings) {
+            addListingMarkers(map.current, listingsWithCoords);
+          }
+
+          if (showHeatmap) {
+            // Add heatmap layer for expensive listings only
+            const avgPrice = districtStats?.avgPriceM2 || 15000;
+            const expensiveListings = listingsWithCoords.filter((l: Listing) => l.pricePerM2 > avgPrice);
+
+            const geojson = {
+              type: 'FeatureCollection' as const,
+              features: expensiveListings.map((l: Listing) => ({
+                type: 'Feature' as const,
+                geometry: { type: 'Point' as const, coordinates: [l.lng, l.lat] },
+                properties: {
+                  price: l.pricePerM2,
+                  weight: Math.min(1, l.pricePerM2 / avgPrice)
+                }
+              }))
+            };
+
+            map.current.addSource('listings-data', { type: 'geojson', data: geojson });
+
+            map.current.addLayer({
+              id: 'listings-heat',
+              type: 'heatmap',
+              source: 'listings-data',
+              paint: {
+                'heatmap-weight': ['get', 'weight'],
+                'heatmap-intensity': 1,
+                'heatmap-radius': 60,
+                'heatmap-opacity': 1,
+                'heatmap-color': [
+                  'step', ['heatmap-density'],
+                  'transparent',
+                  0.15, tierColor + '90'
+                ]
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch listings for map:', err);
+      }
+    };
+
+    fetchListings();
+  }, [focusedDistrict, cityId, clearListingMarkers, addListingMarkers, showListings, showHeatmap]);
+
+  // Toggle district labels visibility
+  useEffect(() => {
+    markersRef.current.forEach(marker => {
+      marker.getElement().style.display = showDistrictLabels ? 'block' : 'none';
+    });
+  }, [showDistrictLabels]);
+
+  // Toggle listing markers visibility
+  useEffect(() => {
+    listingMarkersRef.current.forEach(marker => {
+      marker.getElement().style.display = showListings ? 'block' : 'none';
+    });
+  }, [showListings]);
+
+  // Toggle heatmap visibility
+  useEffect(() => {
+    if (!map.current) return;
+    if (map.current.getLayer('listings-heat')) {
+      map.current.setLayoutProperty('listings-heat', 'visibility', showHeatmap ? 'visible' : 'none');
+    }
+  }, [showHeatmap]);
 
   return (
     <div ref={mapContainer} className="map-container w-full h-full" />

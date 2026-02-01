@@ -31,7 +31,6 @@ body {
 .tactical-panel {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  position: relative;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
@@ -123,6 +122,9 @@ body {
 }
 
 /* MapLibre overrides */
+.maplibregl-popup {
+  z-index: 145;
+}
 .maplibregl-popup-content {
   background: rgba(10, 18, 24, 0.95) !important;
   backdrop-filter: blur(20px);
@@ -132,6 +134,7 @@ body {
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5) !important;
   color: white !important;
   font-family: ui-monospace, monospace !important;
+  z-index: 145;
 }
 
 .maplibregl-popup-close-button {
@@ -188,6 +191,7 @@ body {
 /* District markers on map */
 .district-marker {
   pointer-events: none;
+  z-index: 145;
 }
 
 .district-marker-content {
@@ -454,4 +458,26 @@ body {
   white-space: nowrap;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   z-index: 10;
+}
+
+/* ============================================
+   Listing Markers - Tactical dots for apartments
+   ============================================ */
+@keyframes listing-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.listing-marker {
+  transition: z-index 0.1s;
+}
+
+.listing-marker:hover {
+  z-index: 1000 !important;
 }

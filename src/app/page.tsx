@@ -15,6 +15,24 @@ interface SearchLocation {
   displayName: string;
 }
 
+// Map frontend city IDs to API slugs
+const CITY_API_SLUGS: Record<string, string> = {
+  warsaw: 'warszawa',
+  krakow: 'krakow',
+  wroclaw: 'wroclaw',
+  katowice: 'katowice',
+};
+
+// Get tier color for legend
+function getTierColor(price: number): string {
+  if (price < 12000) return '#22c55e';
+  if (price < 14000) return '#84cc16';
+  if (price < 16000) return '#eab308';
+  if (price < 18000) return '#f97316';
+  if (price < 22000) return '#ef4444';
+  return '#dc2626';
+}
+
 // Dynamic import for Map to avoid SSR issues with MapLibre
 const Map = dynamic(() => import('@/components/Map'), {
   ssr: false,
@@ -28,6 +46,17 @@ const Map = dynamic(() => import('@/components/Map'), {
 export default function Home() {
   const [currentCity, setCurrentCity] = useState('warsaw');
   const [searchLocation, setSearchLocation] = useState<SearchLocation | null>(null);
+  const [focusedDistrict, setFocusedDistrict] = useState<string | null>(null);
+
+  // Map display options
+  const [showListings, setShowListings] = useState(true);
+  const [showDistrictLabels, setShowDistrictLabels] = useState(true);
+  const [showHeatmap, setShowHeatmap] = useState(true);
+
+  // Left panel collapse states
+  const [priceIndexOpen, setPriceIndexOpen] = useState(true);
+  const [districtAnalysisOpen, setDistrictAnalysisOpen] = useState(true);
+  const [layersOpen, setLayersOpen] = useState(true);
 
   const cityConfig = CITIES[currentCity];
   const { data: cityData, loading, error, updatedAt } = useDistrictData(currentCity);
@@ -94,6 +123,7 @@ export default function Home() {
                 onCityChange={(city) => {
                   setCurrentCity(city);
                   setSearchLocation(null);
+                  setFocusedDistrict(null);
                 }}
               />
           </div>
@@ -131,27 +161,78 @@ export default function Home() {
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden p-3 gap-3">
         {/* Left Sidebar */}
-        <aside className="w-72 flex-shrink-0 flex flex-col gap-3">
+        <aside className="w-72 flex-shrink-0 overflow-y-auto flex flex-col gap-3 h-auto">
           {/* Legend Panel */}
-          <div className="tactical-panel tactical-panel-bottom rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
-              <h2 className="tactical-label">PRICE INDEX</h2>
-            </div>
-            <Legend />
+          <div className="tactical-panel tactical-panel-bottom rounded-lg overflow-hidden flex-shrink-0">
+            <button
+              onClick={() => setPriceIndexOpen(!priceIndexOpen)}
+              className="w-full p-3 flex items-center justify-between hover:bg-[#00d4aa08] transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
+                <h2 className="tactical-label">PRICE INDEX</h2>
+              </div>
+              <span className="font-mono text-xs text-[#00d4aa]">{priceIndexOpen ? '−' : '+'}</span>
+            </button>
+            {priceIndexOpen && (
+              <div className="px-4 pb-4">
+                <Legend />
+              </div>
+            )}
+          </div>
+
+          {/* Layers Panel */}
+          <div className="tactical-panel tactical-panel-bottom rounded-lg overflow-hidden flex-shrink-0">
+            <button
+              onClick={() => setLayersOpen(!layersOpen)}
+              className="w-full p-3 flex items-center justify-between hover:bg-[#00d4aa08] transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
+                <h2 className="tactical-label">LAYERS</h2>
+              </div>
+              <span className="font-mono text-xs text-[#00d4aa]">{layersOpen ? '−' : '+'}</span>
+            </button>
+            {layersOpen && (
+              <div className="px-4 pb-3 flex flex-col gap-2">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input type="checkbox" checked={showDistrictLabels} onChange={(e) => setShowDistrictLabels(e.target.checked)} className="accent-[#00d4aa] w-3 h-3" />
+                  <span className="font-mono text-[10px] text-gray-400 group-hover:text-white">DISTRICT LABELS</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input type="checkbox" checked={showListings} onChange={(e) => setShowListings(e.target.checked)} className="accent-[#00d4aa] w-3 h-3" />
+                  <span className="font-mono text-[10px] text-gray-400 group-hover:text-white">LISTINGS</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input type="checkbox" checked={showHeatmap} onChange={(e) => setShowHeatmap(e.target.checked)} className="accent-[#00d4aa] w-3 h-3" />
+                  <span className="font-mono text-[10px] text-gray-400 group-hover:text-white">PRICE HEATMAP</span>
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Stats Panel */}
-          <div className="flex-1 overflow-hidden tactical-panel tactical-panel-bottom rounded-lg">
-            <div className="p-4 h-full flex flex-col">
-              <div className="flex items-center gap-2 mb-3">
+          <div className="min-h-0 tactical-panel tactical-panel-bottom rounded-lg overflow-hidden">
+            <button
+              onClick={() => setDistrictAnalysisOpen(!districtAnalysisOpen)}
+              className="w-full p-3 flex items-center justify-between hover:bg-[#00d4aa08] transition-colors"
+            >
+              <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
                 <h2 className="tactical-label">DISTRICT ANALYSIS</h2>
                 {loading && <span className="font-mono text-[10px] text-gray-500 animate-pulse">LOADING...</span>}
               </div>
-              <div className="flex-1 overflow-hidden">
+              <span className="font-mono text-xs text-[#00d4aa]">{districtAnalysisOpen ? '−' : '+'}</span>
+            </button>
+            {districtAnalysisOpen && (
+              <div className="px-4 pb-4 h-[calc(100%-48px)] overflow-x-hidden overflow-y-scroll">
                 {cityData ? (
-                  <StatsPanel cityData={cityData} />
+                  <StatsPanel
+                    cityData={cityData}
+                    citySlug={CITY_API_SLUGS[currentCity] || currentCity}
+                    selectedDistrict={focusedDistrict}
+                    onDistrictSelect={setFocusedDistrict}
+                  />
                 ) : (
                   <div className="h-full flex items-center justify-center">
                     <span className="font-mono text-xs text-gray-600">
@@ -160,7 +241,7 @@ export default function Home() {
                   </div>
                 )}
               </div>
-            </div>
+            )}
           </div>
         </aside>
 
@@ -189,8 +270,14 @@ export default function Home() {
                 onCityChange={(city) => {
                   setCurrentCity(city);
                   setSearchLocation(null);
+                  setFocusedDistrict(null);
                 }}
                 searchLocation={searchLocation}
+                focusedDistrict={focusedDistrict}
+                onDistrictClick={setFocusedDistrict}
+                showListings={showListings}
+                showDistrictLabels={showDistrictLabels}
+                showHeatmap={showHeatmap}
               />
             ) : null}
 
@@ -203,7 +290,7 @@ export default function Home() {
             </div>
 
             {/* Address Search */}
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-72">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-72 z-[157]">
               <AddressSearch
                 cityName={cityConfig.name}
                 onLocationFound={setSearchLocation}
@@ -211,18 +298,17 @@ export default function Home() {
               />
             </div>
 
-            <div className="absolute top-3 right-12 tactical-panel rounded px-3 py-1.5">
-              <span className="font-mono text-xs text-gray-400">ZOOM: </span>
-              <span className="font-mono text-xs text-[#00d4aa]">{cityConfig.zoom.toFixed(1)}x</span>
-            </div>
-
-            <div className="absolute bottom-3 left-3 tactical-panel rounded px-3 py-1.5">
-              <span className="font-mono text-xs text-gray-400">{cityStats.districtCount} DISTRICTS MONITORED</span>
-            </div>
-
-            <div className="absolute bottom-3 right-3 tactical-panel rounded px-3 py-1.5">
-              <span className="font-mono text-xs text-gray-400">DATA SOURCE: </span>
-              <span className="font-mono text-xs text-[#00d4aa]">OTODOM / OLX</span>
+            
+            <div className="absolute bottom-3 left-3 flex flex-col gap-2">
+              <div className="tactical-panel rounded px-3 py-1.5">
+                <span className="font-mono text-xs text-gray-400">{cityStats.districtCount} DISTRICTS MONITORED</span>
+              </div>
+              {focusedDistrict && cityData?.DISTRICT_STATS[focusedDistrict] && (
+                <div className="tactical-panel rounded px-3 py-1.5 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-sm opacity-90" style={{ backgroundColor: getTierColor(cityData.DISTRICT_STATS[focusedDistrict].avgPriceM2) }} />
+                  <span className="font-mono text-[10px] text-gray-400">ABOVE AVG PRICE ZONE</span>
+                </div>
+              )}
             </div>
           </div>
 
