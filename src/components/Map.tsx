@@ -712,19 +712,29 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
 
           if (showHeatmap) {
             // Add heatmap layer for expensive listings only
-            const avgPrice = districtStats?.avgPriceM2 || 15000;
+            const avgPrice = districtStats?.avgPriceM2;
+            console.log('avg price:', avgPrice);
             const expensiveListings = listingsWithCoords.filter((l: Listing) => l.pricePerM2 > avgPrice);
+            console.log('expensive listings', expensiveListings);
 
             const geojson = {
               type: 'FeatureCollection' as const,
-              features: expensiveListings.map((l: Listing) => ({
-                type: 'Feature' as const,
-                geometry: { type: 'Point' as const, coordinates: [l.lng, l.lat] },
-                properties: {
-                  price: l.pricePerM2,
-                  weight: Math.min(1, l.pricePerM2 / avgPrice)
-                }
-              }))
+              features: expensiveListings.map((l: Listing) => {
+                // Calculate how much more expensive than average (1.0 = avg, 2.0 = double avg)
+                const priceRatio = l.pricePerM2 / avgPrice;
+                // Weight for size (1-2x avg = 0.3-1.0)
+                const weight = Math.min(1, Math.max(0.3, (priceRatio - 1) * 2));
+
+                return {
+                  type: 'Feature' as const,
+                  geometry: { type: 'Point' as const, coordinates: [l.lng, l.lat] },
+                  properties: {
+                    price: l.pricePerM2,
+                    weight: weight,
+                    priceRatio: priceRatio
+                  }
+                };
+              })
             };
 
             map.current.addSource('listings-data', { type: 'geojson', data: geojson });
@@ -738,10 +748,17 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
                 'heatmap-intensity': 1,
                 'heatmap-radius': 60,
                 'heatmap-opacity': 1,
+                // Vary color opacity based on price ratio
                 'heatmap-color': [
-                  'step', ['heatmap-density'],
-                  'transparent',
-                  0.15, tierColor + '90'
+                  'interpolate',
+                  ['linear'],
+                  ['heatmap-density'],
+                  0, 'transparent',
+                  0.1, tierColor + '30',  // 20% opacity for just above average
+                  0.3, tierColor + '60',  // 40% opacity
+                  0.5, tierColor + '90',  // 60% opacity
+                  0.7, tierColor + 'c0',  // 75% opacity
+                  1.0, tierColor + 'ff'   // 100% opacity for most expensive
                 ]
               }
             });

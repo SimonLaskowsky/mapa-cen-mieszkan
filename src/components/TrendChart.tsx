@@ -66,7 +66,7 @@ export default function TrendChart({ city, district, onClose }: TrendChartProps)
   }
 
   // Chart dimensions
-  const width = 280;
+  const width = 210;
   const height = 120;
   const padding = { top: 10, right: 10, bottom: 20, left: 45 };
   const chartWidth = width - padding.left - padding.right;
