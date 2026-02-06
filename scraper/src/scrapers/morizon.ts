@@ -198,18 +198,25 @@ export class MorizonScraper {
             const roomsMatch = detailsText.match(/(\d+)\s*pok/i);
             const sizeMatch = detailsText.match(/(\d+[,.]?\d*)\s*m[²2]/i);
 
-            // Extract thumbnail image
-            const imgEl = card.querySelector('img[src*="morizon"], img[data-src*="morizon"], .property-card__image img, img');
+            // Extract thumbnail image - look for actual property photos
+            // Morizon uses img tags with src containing image hosting domains
+            const imgEl = card.querySelector('img[src*="cdn"], img[src*="img"], img[data-src*="cdn"], img[data-src*="img"]');
             let thumbnailUrl: string | null = null;
             if (imgEl) {
               // Try data-src first (lazy loading), then src
               thumbnailUrl = (imgEl as HTMLImageElement).dataset.src ||
                             (imgEl as HTMLImageElement).src ||
                             null;
-              // Skip placeholder/default images
-              if (thumbnailUrl && (thumbnailUrl.includes('placeholder') || thumbnailUrl.includes('no-image'))) {
-                thumbnailUrl = null;
-              }
+            }
+            // Skip placeholder/default images (svg, camera icons, nuxt-assets, etc.)
+            if (thumbnailUrl && (
+              thumbnailUrl.includes('placeholder') ||
+              thumbnailUrl.includes('no-image') ||
+              thumbnailUrl.includes('.svg') ||
+              thumbnailUrl.includes('nuxt-assets') ||
+              thumbnailUrl.includes('camera')
+            )) {
+              thumbnailUrl = null;
             }
 
             results.push({

@@ -192,6 +192,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
       coordCounts[key] = (coordCounts[key] || 0) + 1;
     });
 
+    console.log('Listing data', listingsData)
     listingsData.forEach((listing, index) => {
       const priceK = Math.round(listing.price / 1000);
       const priceM2K = (listing.pricePerM2 / 1000).toFixed(1);
@@ -213,6 +214,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
       }
 
       const el = document.createElement('div');
+      console.log('Listing thumbnail url:',listing.thumbnailUrl);
       el.className = 'listing-marker';
       el.style.cssText = `
         width: 0;
@@ -260,11 +262,11 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
           opacity: 0;
           pointer-events: none;
           transition: opacity 0.2s ease;
-          min-width: 120px;
+          min-width: 140px;
         ">
           ${listing.thumbnailUrl ? `
             <img src="${listing.thumbnailUrl}" alt="" style="
-              width: 120px;
+              width: 140px;
               height: 80px;
               object-fit: cover;
               border-radius: 2px;
