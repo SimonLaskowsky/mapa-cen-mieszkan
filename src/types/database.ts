@@ -223,7 +223,9 @@ export interface Database {
           id: string;
           city: string;
           district: string;
+          offer_type: string;
           date: string;
+          avg_price: number | null;
           avg_price_m2: number | null;
           median_price_m2: number | null;
           min_price_m2: number | null;
@@ -243,9 +245,13 @@ export interface Database {
         Row: {
           city: string;
           district: string;
+          offer_type: string;
           current_price: number | null;
+          current_total_price: number | null;
           previous_price: number | null;
+          previous_total_price: number | null;
           change_percent_30d: number | null;
+          total_price_change_percent_30d: number | null;
         };
       };
     };

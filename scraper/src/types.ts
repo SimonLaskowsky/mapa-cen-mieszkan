@@ -12,6 +12,7 @@ export interface ScrapedListing {
   offerType: 'sale' | 'rent';
   url: string;
   title?: string;
+  thumbnailUrl?: string;
   scrapedAt: Date;
 }
 
@@ -21,6 +22,7 @@ export interface DistrictMapping {
 
 export interface ScraperConfig {
   city: string;
+  offerType: 'sale' | 'rent';
   maxPages: number;
   delayMs: number;
   headless: boolean;

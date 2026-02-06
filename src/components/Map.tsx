@@ -16,6 +16,7 @@ interface Listing {
   rooms: number | null;
   address: string | null;
   url: string;
+  thumbnailUrl: string | null;
 }
 
 // ============================================
@@ -38,9 +39,18 @@ interface SearchLocation {
   displayName: string;
 }
 
+interface ListingFilters {
+  minPrice?: number;
+  maxPrice?: number;
+  minSize?: number;
+  maxSize?: number;
+  rooms?: number[];
+}
+
 interface MapProps {
   cityId: string;
   cityData: CityData;
+  offerType?: 'sale' | 'rent';
   onCityChange?: (cityId: string) => void;
   onDistrictSelect?: (district: DistrictStats | null) => void;
   searchLocation?: SearchLocation | null;
@@ -49,16 +59,29 @@ interface MapProps {
   showListings?: boolean;
   showDistrictLabels?: boolean;
   showHeatmap?: boolean;
+  listingFilters?: ListingFilters;
+  hoveredListingId?: string;
 }
 
-// Get price tier (1-6) for color coding
-function getPriceTier(price: number): number {
-  if (price < 12000) return 1;
-  if (price < 14000) return 2;
-  if (price < 16000) return 3;
-  if (price < 18000) return 4;
-  if (price < 22000) return 5;
-  return 6;
+// Get price tier (1-6) for color coding based on offer type
+function getPriceTier(price: number, offerType: 'sale' | 'rent' = 'sale'): number {
+  if (offerType === 'rent') {
+    // Rent tiers (monthly price)
+    if (price < 2500) return 1;
+    if (price < 3500) return 2;
+    if (price < 4500) return 3;
+    if (price < 5500) return 4;
+    if (price < 7000) return 5;
+    return 6;
+  } else {
+    // Sale tiers (price per m²)
+    if (price < 12000) return 1;
+    if (price < 14000) return 2;
+    if (price < 16000) return 3;
+    if (price < 18000) return 4;
+    if (price < 22000) return 5;
+    return 6;
+  }
 }
 
 // Get color for price tier
@@ -74,6 +97,16 @@ function getTierColor(tier: number): string {
   return colors[tier] || '#666';
 }
 
+// Get color for a listing based on its price relative to district average
+function getPriceRatioColor(pricePerM2: number, avgPriceM2: number): string {
+  const ratio = pricePerM2 / avgPriceM2;
+  if (ratio <= 0.7) return '#22c55e';
+  if (ratio <= 0.85) return '#84cc16';
+  if (ratio <= 1.0) return '#eab308';
+  if (ratio <= 1.15) return '#f97316';
+  return '#ef4444';
+}
+
 // Generate price bar visualization (█░)
 function getPriceBars(tier: number): string {
   const filled = tier;
@@ -81,25 +114,37 @@ function getPriceBars(tier: number): string {
   return '█'.repeat(filled) + '░'.repeat(empty);
 }
 
-function getPriceThreatLevel(price: number): { label: string; color: string } {
-  if (price < 12000) return { label: 'LOW', color: '#22c55e' };
-  if (price < 14000) return { label: 'MODERATE', color: '#84cc16' };
-  if (price < 16000) return { label: 'ELEVATED', color: '#eab308' };
-  if (price < 18000) return { label: 'HIGH', color: '#f97316' };
-  if (price < 22000) return { label: 'SEVERE', color: '#ef4444' };
-  return { label: 'CRITICAL', color: '#dc2626' };
+function getPriceThreatLevel(price: number, offerType: 'sale' | 'rent' = 'sale'): { label: string; color: string } {
+  if (offerType === 'rent') {
+    if (price < 2500) return { label: 'LOW', color: '#22c55e' };
+    if (price < 3500) return { label: 'MODERATE', color: '#84cc16' };
+    if (price < 4500) return { label: 'ELEVATED', color: '#eab308' };
+    if (price < 5500) return { label: 'HIGH', color: '#f97316' };
+    if (price < 7000) return { label: 'SEVERE', color: '#ef4444' };
+    return { label: 'CRITICAL', color: '#dc2626' };
+  } else {
+    if (price < 12000) return { label: 'LOW', color: '#22c55e' };
+    if (price < 14000) return { label: 'MODERATE', color: '#84cc16' };
+    if (price < 16000) return { label: 'ELEVATED', color: '#eab308' };
+    if (price < 18000) return { label: 'HIGH', color: '#f97316' };
+    if (price < 22000) return { label: 'SEVERE', color: '#ef4444' };
+    return { label: 'CRITICAL', color: '#dc2626' };
+  }
 }
 
-export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, searchLocation, focusedDistrict, onDistrictClick, showListings = true, showDistrictLabels = true, showHeatmap = true }: MapProps) {
+export default function Map({ cityId, cityData, offerType = 'sale', onCityChange, onDistrictSelect, searchLocation, focusedDistrict, onDistrictClick, showListings = true, showDistrictLabels = true, showHeatmap = true, listingFilters, hoveredListingId }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popup = useRef<maplibregl.Popup | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const listingMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const listingMarkerElementsRef = useRef<Record<string, HTMLElement>>({});
   const searchMarkerRef = useRef<maplibregl.Marker | null>(null);
   const currentCityRef = useRef(cityId);
   const cityDataRef = useRef(cityData);
   const onDistrictClickRef = useRef(onDistrictClick);
+  const showDistrictLabelsRef = useRef(showDistrictLabels);
+  const showListingsRef = useRef(showListings);
   const [listings, setListings] = useState<Listing[]>([]);
 
   // Get current city config
@@ -114,6 +159,14 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
     onDistrictClickRef.current = onDistrictClick;
   }, [onDistrictClick]);
 
+  useEffect(() => {
+    showDistrictLabelsRef.current = showDistrictLabels;
+  }, [showDistrictLabels]);
+
+  useEffect(() => {
+    showListingsRef.current = showListings;
+  }, [showListings]);
+
   // Remove existing markers
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach(marker => marker.remove());
@@ -124,15 +177,40 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
   const clearListingMarkers = useCallback(() => {
     listingMarkersRef.current.forEach(marker => marker.remove());
     listingMarkersRef.current = [];
+    listingMarkerElementsRef.current = {};
   }, []);
 
   // Add listing markers to map
-  const addListingMarkers = useCallback((mapInstance: maplibregl.Map, listingsData: Listing[]) => {
+  const addListingMarkers = useCallback((mapInstance: maplibregl.Map, listingsData: Listing[], avgPriceM2?: number) => {
     clearListingMarkers();
+
+    // Detect overlapping coordinates and offset them
+    const coordCounts: Record<string, number> = {};
+    const coordIndices: Record<string, number> = {};
+    listingsData.forEach((listing) => {
+      const key = `${listing.lat.toFixed(5)},${listing.lng.toFixed(5)}`;
+      coordCounts[key] = (coordCounts[key] || 0) + 1;
+    });
 
     listingsData.forEach((listing, index) => {
       const priceK = Math.round(listing.price / 1000);
       const priceM2K = (listing.pricePerM2 / 1000).toFixed(1);
+      const pulseColor = avgPriceM2 ? getPriceRatioColor(listing.pricePerM2, avgPriceM2) : '#00d4aa';
+
+      // Offset duplicates in a circle around the original point
+      const key = `${listing.lat.toFixed(5)},${listing.lng.toFixed(5)}`;
+      const total = coordCounts[key] || 1;
+      const dupIndex = coordIndices[key] || 0;
+      coordIndices[key] = dupIndex + 1;
+
+      let offsetLat = 0;
+      let offsetLng = 0;
+      if (total > 1) {
+        const angle = (2 * Math.PI * dupIndex) / total;
+        const radius = 0.0003; // ~30m offset
+        offsetLat = Math.cos(angle) * radius;
+        offsetLng = Math.sin(angle) * radius;
+      }
 
       const el = document.createElement('div');
       el.className = 'listing-marker';
@@ -145,11 +223,11 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
       el.innerHTML = `
         <div class="listing-marker-dot" style="
           position: absolute;
-          top: -7px;
-          left: -7px;
+          top: -5px;
+          left: -5px;
           width: 10px;
           height: 10px;
-          background: #00d4aa;
+          background: ${pulseColor};
           border: 2px solid #05080a;
           transform: rotate(45deg);
           box-shadow: 0 0 8px rgba(0,212,170,0.6);
@@ -158,14 +236,13 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
         "></div>
         <div class="listing-marker-pulse" style="
           position: absolute;
-          top: -14px;
-          left: -14px;
+          top: -12px;
+          left: -12px;
           width: 24px;
           height: 24px;
           border: 1px solid rgba(0,212,170,0.4);
           border-radius: 50%;
           animation: listing-pulse 2s ease-out infinite;
-          animation-delay: ${index * 0.1}s;
           pointer-events: none;
         "></div>
         <div class="listing-marker-tooltip" style="
@@ -176,14 +253,25 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
           background: rgba(5,8,10,0.95);
           border: 1px solid rgba(0,212,170,0.5);
           border-radius: 4px;
-          padding: 6px 10px;
+          padding: 6px;
           font-family: ui-monospace, monospace;
           font-size: 10px;
           white-space: nowrap;
           opacity: 0;
           pointer-events: none;
           transition: opacity 0.2s ease;
+          min-width: 120px;
         ">
+          ${listing.thumbnailUrl ? `
+            <img src="${listing.thumbnailUrl}" alt="" style="
+              width: 120px;
+              height: 80px;
+              object-fit: cover;
+              border-radius: 2px;
+              margin-bottom: 6px;
+              display: block;
+            " onerror="this.style.display='none'" />
+          ` : ''}
           <div style="color: #00d4aa; font-weight: 600;">${priceK}K PLN</div>
           <div style="color: rgba(255,255,255,0.6); margin-top: 2px;">${listing.sizeM2}m² · ${priceM2K}K/m²</div>
           ${listing.rooms ? `<div style="color: rgba(255,255,255,0.4);">${listing.rooms} rooms</div>` : ''}
@@ -210,14 +298,23 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
         }
       });
 
-      // Click opens listing URL
+      // Click opens listing URL in background tab
       el.addEventListener('click', (e) => {
         e.stopPropagation();
-        window.open(listing.url, '_blank');
+        const a = document.createElement('a');
+        a.href = listing.url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.click();
       });
 
+      el.style.display = showListingsRef.current ? 'block' : 'none';
+
+      // Store element reference by listing ID for hover highlighting
+      listingMarkerElementsRef.current[listing.id] = el;
+
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([listing.lng, listing.lat])
+        .setLngLat([listing.lng + offsetLng, listing.lat + offsetLat])
         .addTo(mapInstance);
 
       listingMarkersRef.current.push(marker);
@@ -230,7 +327,9 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
 
     data.DISTRICT_CENTERS.forEach((district) => {
       const stats = district.stats;
-      const tier = getPriceTier(stats.avgPriceM2);
+      // Use appropriate price based on offer type
+      const displayPrice = offerType === 'rent' ? (stats.avgPrice || 0) : stats.avgPriceM2;
+      const tier = getPriceTier(displayPrice, offerType);
       const color = getTierColor(tier);
       const bars = getPriceBars(tier);
       const changeIcon = stats.change30d >= 0 ? '▲' : '▼';
@@ -243,7 +342,7 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
         <div class="district-marker-content" style="--tier-color: ${color};">
           <div class="marker-name">${displayName}</div>
           <div class="marker-bars" style="color: ${color};">${bars}</div>
-          <div class="marker-price">${(stats.avgPriceM2 / 1000).toFixed(1)}k</div>
+          <div class="marker-price">${(displayPrice / 1000).toFixed(1)}k</div>
           <div class="marker-meta">
             <span class="marker-listings">${stats.listingCount}</span>
             <span class="marker-change" style="color: ${changeColor};">${changeIcon}${Math.abs(stats.change30d).toFixed(1)}%</span>
@@ -251,13 +350,15 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
         </div>
       `;
 
+      el.style.display = showDistrictLabelsRef.current ? 'block' : 'none';
+
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([district.lng, district.lat])
         .addTo(mapInstance);
 
       markersRef.current.push(marker);
     });
-  }, [clearMarkers]);
+  }, [clearMarkers, offerType]);
 
   // Update map layers with new city data
   const updateMapData = useCallback((mapInstance: maplibregl.Map, data: typeof cityData) => {
@@ -560,6 +661,7 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
     clearListingMarkers();
     if (map.current.getLayer('listings-heat')) map.current.removeLayer('listings-heat');
     if (map.current.getSource('listings-data')) map.current.removeSource('listings-data');
+    if (map.current.getSource('listings-heat-data')) map.current.removeSource('listings-heat-data');
   }, [cityId, cityData, updateMapData, clearListingMarkers]);
 
   // Handle search location marker
@@ -679,12 +781,15 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
     // Clear existing listing markers when district changes
     clearListingMarkers();
 
-    // Remove existing heatmap layer and source
+    // Remove existing heatmap/price-circles layers and sources
     if (map.current.getLayer('listings-heat')) {
       map.current.removeLayer('listings-heat');
     }
     if (map.current.getSource('listings-data')) {
       map.current.removeSource('listings-data');
+    }
+    if (map.current.getSource('listings-heat-data')) {
+      map.current.removeSource('listings-heat-data');
     }
 
     if (!focusedDistrict) {
@@ -699,66 +804,74 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
 
     const fetchListings = async () => {
       try {
-        const response = await fetch(`/api/listings?city=${citySlug}&district=${focusedDistrict}&limit=100`);
+        const params = new URLSearchParams({
+          city: citySlug,
+          district: focusedDistrict,
+          offerType,
+          limit: '100',
+        });
+        if (listingFilters?.minPrice) params.set('minPrice', String(listingFilters.minPrice));
+        if (listingFilters?.maxPrice) params.set('maxPrice', String(listingFilters.maxPrice));
+        if (listingFilters?.minSize) params.set('minSize', String(listingFilters.minSize));
+        if (listingFilters?.maxSize) params.set('maxSize', String(listingFilters.maxSize));
+        if (listingFilters?.rooms?.length) params.set('rooms', listingFilters.rooms.join(','));
+
+        const response = await fetch(`/api/listings?${params}`);
         if (!response.ok) throw new Error('Failed to fetch');
         const data = await response.json();
         const listingsWithCoords = (data.listings || []).filter((l: Listing) => l.lat && l.lng);
         setListings(listingsWithCoords);
 
         if (map.current && listingsWithCoords.length > 0) {
+          const avgPrice = districtStats?.avgPriceM2 || 1;
+
           if (showListings) {
-            addListingMarkers(map.current, listingsWithCoords);
+            addListingMarkers(map.current, listingsWithCoords, avgPrice);
           }
 
+          // Heatmap layer (hidden, kept for future use)
           if (showHeatmap) {
-            // Add heatmap layer for expensive listings only
-            const avgPrice = districtStats?.avgPriceM2;
-            console.log('avg price:', avgPrice);
             const expensiveListings = listingsWithCoords.filter((l: Listing) => l.pricePerM2 > avgPrice);
-            console.log('expensive listings', expensiveListings);
-
-            const geojson = {
+            const heatGeojson = {
               type: 'FeatureCollection' as const,
               features: expensiveListings.map((l: Listing) => {
-                // Calculate how much more expensive than average (1.0 = avg, 2.0 = double avg)
                 const priceRatio = l.pricePerM2 / avgPrice;
-                // Weight for size (1-2x avg = 0.3-1.0)
                 const weight = Math.min(1, Math.max(0.3, (priceRatio - 1) * 2));
-
                 return {
                   type: 'Feature' as const,
                   geometry: { type: 'Point' as const, coordinates: [l.lng, l.lat] },
-                  properties: {
-                    price: l.pricePerM2,
-                    weight: weight,
-                    priceRatio: priceRatio
-                  }
+                  properties: { price: l.pricePerM2, weight, priceRatio }
                 };
               })
             };
 
-            map.current.addSource('listings-data', { type: 'geojson', data: geojson });
+            // Re-use source if heatmap is on alongside circles
+            const heatSourceId = 'listings-heat-data';
+            if (map.current.getSource(heatSourceId)) {
+              (map.current.getSource(heatSourceId) as maplibregl.GeoJSONSource).setData(heatGeojson);
+            } else {
+              map.current.addSource(heatSourceId, { type: 'geojson', data: heatGeojson });
+            }
 
             map.current.addLayer({
               id: 'listings-heat',
               type: 'heatmap',
-              source: 'listings-data',
+              source: heatSourceId,
               paint: {
                 'heatmap-weight': ['get', 'weight'],
                 'heatmap-intensity': 1,
                 'heatmap-radius': 60,
                 'heatmap-opacity': 1,
-                // Vary color opacity based on price ratio
                 'heatmap-color': [
                   'interpolate',
                   ['linear'],
                   ['heatmap-density'],
                   0, 'transparent',
-                  0.1, tierColor + '30',  // 20% opacity for just above average
-                  0.3, tierColor + '60',  // 40% opacity
-                  0.5, tierColor + '90',  // 60% opacity
-                  0.7, tierColor + 'c0',  // 75% opacity
-                  1.0, tierColor + 'ff'   // 100% opacity for most expensive
+                  0.1, tierColor + '30',
+                  0.3, tierColor + '60',
+                  0.5, tierColor + '90',
+                  0.7, tierColor + 'c0',
+                  1.0, tierColor + 'ff'
                 ]
               }
             });
@@ -770,7 +883,7 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
     };
 
     fetchListings();
-  }, [focusedDistrict, cityId, clearListingMarkers, addListingMarkers, showListings, showHeatmap]);
+  }, [focusedDistrict, cityId, offerType, clearListingMarkers, addListingMarkers, showListings, showHeatmap, listingFilters]);
 
   // Toggle district labels visibility
   useEffect(() => {
@@ -793,6 +906,30 @@ export default function Map({ cityId, cityData, onCityChange, onDistrictSelect, 
       map.current.setLayoutProperty('listings-heat', 'visibility', showHeatmap ? 'visible' : 'none');
     }
   }, [showHeatmap]);
+
+  // Highlight listing marker on hover from panel
+  useEffect(() => {
+    // Reset all markers to normal state
+    Object.values(listingMarkerElementsRef.current).forEach((el) => {
+      const dot = el.querySelector('.listing-marker-dot') as HTMLElement;
+      if (dot) {
+        dot.style.transform = 'rotate(45deg) scale(1)';
+        dot.style.boxShadow = '0 0 8px rgba(0,212,170,0.6)';
+      }
+      el.style.zIndex = '';
+    });
+
+    // Highlight the hovered marker
+    if (hoveredListingId && listingMarkerElementsRef.current[hoveredListingId]) {
+      const el = listingMarkerElementsRef.current[hoveredListingId];
+      const dot = el.querySelector('.listing-marker-dot') as HTMLElement;
+      if (dot) {
+        dot.style.transform = 'rotate(45deg) scale(1.5)';
+        dot.style.boxShadow = '0 0 20px rgba(0,212,170,1)';
+      }
+      el.style.zIndex = '1000';
+    }
+  }, [hoveredListingId]);
 
   return (
     <div ref={mapContainer} className="map-container w-full h-full" />

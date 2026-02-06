@@ -11,6 +11,7 @@ import {
 
 const DEFAULT_CONFIG: ScraperConfig = {
   city: 'warszawa',
+  offerType: 'sale',
   maxPages: 50,
   delayMs: 2000,
   headless: true,
@@ -24,6 +25,7 @@ interface MorizonListing {
   rooms: string;
   location: string;
   externalId: string;
+  thumbnailUrl: string | null;
 }
 
 export class MorizonScraper {
@@ -83,12 +85,14 @@ export class MorizonScraper {
 
   private buildSearchUrl(page: number): string {
     const citySlug = this.config.city.toLowerCase();
-    // Morizon search URL for apartments for sale
+    // Morizon URL structure: /mieszkania/ for sale, /do-wynajecia/mieszkania/ for rent
+    const pathPrefix = this.config.offerType === 'sale' ? 'mieszkania' : 'do-wynajecia/mieszkania';
+
     // Page 1 has no page parameter, subsequent pages use ?page=N
     if (page === 1) {
-      return `https://www.morizon.pl/mieszkania/${citySlug}/`;
+      return `https://www.morizon.pl/${pathPrefix}/${citySlug}/`;
     }
-    return `https://www.morizon.pl/mieszkania/${citySlug}/?page=${page}`;
+    return `https://www.morizon.pl/${pathPrefix}/${citySlug}/?page=${page}`;
   }
 
   async acceptCookies(): Promise<void> {
@@ -194,6 +198,20 @@ export class MorizonScraper {
             const roomsMatch = detailsText.match(/(\d+)\s*pok/i);
             const sizeMatch = detailsText.match(/(\d+[,.]?\d*)\s*m[²2]/i);
 
+            // Extract thumbnail image
+            const imgEl = card.querySelector('img[src*="morizon"], img[data-src*="morizon"], .property-card__image img, img');
+            let thumbnailUrl: string | null = null;
+            if (imgEl) {
+              // Try data-src first (lazy loading), then src
+              thumbnailUrl = (imgEl as HTMLImageElement).dataset.src ||
+                            (imgEl as HTMLImageElement).src ||
+                            null;
+              // Skip placeholder/default images
+              if (thumbnailUrl && (thumbnailUrl.includes('placeholder') || thumbnailUrl.includes('no-image'))) {
+                thumbnailUrl = null;
+              }
+            }
+
             results.push({
               url: href,
               externalId,
@@ -202,6 +220,7 @@ export class MorizonScraper {
               size: sizeMatch ? sizeMatch[1].replace(',', '.') : '',
               rooms: roomsMatch ? roomsMatch[1] : '',
               location: locationEl?.textContent?.trim() || '',
+              thumbnailUrl,
             });
           } catch (e) {
             debugInfo.push(`Card ${index}: Error - ${e}`);
@@ -255,7 +274,12 @@ export class MorizonScraper {
       const size = parseSize(raw.size);
 
       // Skip invalid listings
-      if (!price || price < 10000) continue; // Min 10k PLN
+      // Different price validation for sale vs rent
+      if (this.config.offerType === 'sale') {
+        if (!price || price < 10000) continue; // Min 10k PLN for sale
+      } else {
+        if (!price || price < 500 || price > 50000) continue; // 500-50k PLN/month for rent
+      }
       if (!size || size < 10 || size > 500) continue; // 10-500 m²
 
       const { district, address } = this.parseLocation(raw.location);
@@ -277,9 +301,10 @@ export class MorizonScraper {
         price,
         sizeM2: size,
         rooms: parseRooms(raw.rooms) || undefined,
-        offerType: 'sale',
+        offerType: this.config.offerType,
         url: raw.url,
         title: raw.title || undefined,
+        thumbnailUrl: raw.thumbnailUrl || undefined,
         scrapedAt: now,
       });
     }

@@ -12,6 +12,7 @@ import {
 
 const DEFAULT_CONFIG: ScraperConfig = {
   city: 'warszawa',
+  offerType: 'sale',
   maxPages: 50,
   delayMs: 2000,
   headless: true,
@@ -66,8 +67,9 @@ export class OtodomScraper {
 
   private buildSearchUrl(page: number): string {
     const citySlug = this.config.city.toLowerCase();
-    // Otodom search URL for apartments for sale
-    return `https://www.otodom.pl/pl/wyniki/sprzedaz/mieszkanie/${citySlug}/${citySlug}/${citySlug}?page=${page}&limit=72`;
+    const transactionType = this.config.offerType === 'sale' ? 'sprzedaz' : 'wynajem';
+    // Otodom search URL for apartments
+    return `https://www.otodom.pl/pl/wyniki/${transactionType}/mieszkanie/${citySlug}/${citySlug}/${citySlug}?page=${page}&limit=72`;
   }
 
   async scrapeListingsPage(pageNum: number): Promise<OtodomListing[]> {
@@ -167,7 +169,7 @@ export class OtodomScraper {
         price,
         sizeM2: size,
         rooms: parseRooms(raw.rooms) || undefined,
-        offerType: 'sale',
+        offerType: this.config.offerType,
         url: raw.url,
         title: raw.title || undefined,
         scrapedAt: now,

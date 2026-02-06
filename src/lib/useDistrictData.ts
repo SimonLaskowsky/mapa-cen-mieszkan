@@ -26,7 +26,9 @@ const CITY_SLUG_MAP: Record<string, string> = {
 
 interface APIDistrictData {
   district: string;
+  offerType: string;
   date: string;
+  avgPrice: number | null;
   avgPriceM2: number | null;
   medianPriceM2: number | null;
   minPriceM2: number | null;
@@ -78,6 +80,8 @@ function transformAPIResponse(response: APIResponse, cityId: string): CityData {
   response.districts.forEach(d => {
     DISTRICT_STATS[d.district] = {
       district: d.district,
+      offerType: d.offerType,
+      avgPrice: d.avgPrice || 0,
       avgPriceM2: d.avgPriceM2 || 0,
       medianPriceM2: d.medianPriceM2 || 0,
       listingCount: d.listingCount || 0,
@@ -131,7 +135,7 @@ function transformAPIResponse(response: APIResponse, cityId: string): CityData {
   };
 }
 
-export function useDistrictData(cityId: string): UseDistrictDataResult {
+export function useDistrictData(cityId: string, offerType: 'sale' | 'rent' = 'sale'): UseDistrictDataResult {
   const [data, setData] = useState<CityData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,7 +148,7 @@ export function useDistrictData(cityId: string): UseDistrictDataResult {
 
       try {
         const apiSlug = CITY_SLUG_MAP[cityId] || cityId;
-        const response = await fetch(`/api/cities/${apiSlug}/districts`);
+        const response = await fetch(`/api/cities/${apiSlug}/districts?offerType=${offerType}`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch: ${response.status}`);
@@ -171,7 +175,7 @@ export function useDistrictData(cityId: string): UseDistrictDataResult {
     };
 
     fetchData();
-  }, [cityId]);
+  }, [cityId, offerType]);
 
   return { data, loading, error, updatedAt };
 }

@@ -31,6 +31,7 @@ export async function insertListings(listings: ScrapedListing[]): Promise<number
     offer_type: l.offerType,
     url: l.url,
     title: l.title,
+    thumbnail_url: l.thumbnailUrl,
     scraped_at: l.scrapedAt.toISOString(),
   }));
 

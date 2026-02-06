@@ -17,6 +17,7 @@ body {
   color: var(--foreground);
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 /* Grid background */

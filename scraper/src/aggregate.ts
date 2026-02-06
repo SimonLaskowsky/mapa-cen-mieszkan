@@ -3,15 +3,19 @@ import { supabase } from './db.js';
 interface ListingRow {
   city: string;
   district: string;
+  price: number;
   price_per_m2: number;
   size_m2: number;
   rooms: number | null;
+  offer_type: string;
 }
 
 interface StatsRow {
   city: string;
   district: string;
+  offer_type: string;
   date: string;
+  avg_price: number;
   avg_price_m2: number;
   median_price_m2: number;
   min_price_m2: number;
@@ -48,6 +52,7 @@ function calculateStdDev(arr: number[], mean: number): number {
 async function aggregateDistrict(
   city: string,
   district: string,
+  offerType: string,
   date: string
 ): Promise<StatsRow | null> {
   // Fetch all listings for this district from the last 30 days
@@ -56,9 +61,10 @@ async function aggregateDistrict(
 
   const { data: listings, error } = await supabase
     .from('listings')
-    .select('price_per_m2, size_m2, rooms')
+    .select('price, price_per_m2, size_m2, rooms, offer_type')
     .eq('city', city)
     .eq('district', district)
+    .eq('offer_type', offerType)
     .gte('scraped_at', thirtyDaysAgo.toISOString())
     .returns<ListingRow[]>();
 
@@ -72,19 +78,24 @@ async function aggregateDistrict(
   }
 
   // Calculate statistics
-  const prices = listings
+  const pricesPerM2 = listings
     .map((l) => l.price_per_m2)
     .filter((p): p is number => p !== null)
     .sort((a, b) => a - b);
+
+  const totalPrices = listings
+    .map((l) => l.price)
+    .filter((p): p is number => p !== null);
 
   const sizes = listings
     .map((l) => l.size_m2)
     .filter((s): s is number => s !== null);
 
-  if (prices.length === 0) return null;
+  if (pricesPerM2.length === 0) return null;
 
-  const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
-  const medianPrice = calculatePercentile(prices, 50);
+  const avgPricePerM2 = pricesPerM2.reduce((a, b) => a + b, 0) / pricesPerM2.length;
+  const avgTotalPrice = totalPrices.length > 0 ? totalPrices.reduce((a, b) => a + b, 0) / totalPrices.length : 0;
+  const medianPrice = calculatePercentile(pricesPerM2, 50);
   const avgSize = sizes.length > 0 ? sizes.reduce((a, b) => a + b, 0) / sizes.length : 0;
 
   // Count new listings (scraped today)
@@ -96,6 +107,7 @@ async function aggregateDistrict(
     .select('*', { count: 'exact', head: true })
     .eq('city', city)
     .eq('district', district)
+    .eq('offer_type', offerType)
     .gte('scraped_at', today.toISOString());
 
   // Room distribution
@@ -110,14 +122,16 @@ async function aggregateDistrict(
   return {
     city,
     district,
+    offer_type: offerType,
     date,
-    avg_price_m2: Math.round(avgPrice),
+    avg_price: Math.round(avgTotalPrice),
+    avg_price_m2: Math.round(avgPricePerM2),
     median_price_m2: Math.round(medianPrice),
-    min_price_m2: Math.round(prices[0]),
-    max_price_m2: Math.round(prices[prices.length - 1]),
-    p10_price_m2: Math.round(calculatePercentile(prices, 10)),
-    p90_price_m2: Math.round(calculatePercentile(prices, 90)),
-    stddev_price_m2: Math.round(calculateStdDev(prices, avgPrice)),
+    min_price_m2: Math.round(pricesPerM2[0]),
+    max_price_m2: Math.round(pricesPerM2[pricesPerM2.length - 1]),
+    p10_price_m2: Math.round(calculatePercentile(pricesPerM2, 10)),
+    p90_price_m2: Math.round(calculatePercentile(pricesPerM2, 90)),
+    stddev_price_m2: Math.round(calculateStdDev(pricesPerM2, avgPricePerM2)),
     listing_count: listings.length,
     new_listings: newListings || 0,
     avg_size_m2: Math.round(avgSize * 10) / 10,
@@ -144,29 +158,36 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`📍 Processing ${districts.length} districts...\n`);
+  console.log(`📍 Processing ${districts.length} districts x 2 offer types...\n`);
 
   let aggregated = 0;
   let skipped = 0;
 
+  const offerTypes = ['sale', 'rent'];
+
   for (const { city, district } of districts) {
-    const stats = await aggregateDistrict(city, district, today);
+    for (const offerType of offerTypes) {
+      const stats = await aggregateDistrict(city, district, offerType, today);
 
-    if (stats) {
-      const { error } = await supabase.from('district_stats').upsert(stats, {
-        onConflict: 'city,district,date',
-      });
+      if (stats) {
+        const { error } = await supabase.from('district_stats').upsert(stats, {
+          onConflict: 'city,district,date,offer_type',
+        });
 
-      if (error) {
-        console.error(`  ❌ ${city}/${district}: ${error.message}`);
+        if (error) {
+          console.error(`  ❌ ${city}/${district} (${offerType}): ${error.message}`);
+        } else {
+          const displayPrice = offerType === 'sale'
+            ? `${stats.avg_price_m2} zł/m²`
+            : `${stats.avg_price} zł/month`;
+          console.log(
+            `  ✅ ${city}/${district} (${offerType}): ${stats.listing_count} listings, avg ${displayPrice}`
+          );
+          aggregated++;
+        }
       } else {
-        console.log(
-          `  ✅ ${city}/${district}: ${stats.listing_count} listings, avg ${stats.avg_price_m2} zł/m²`
-        );
-        aggregated++;
+        skipped++;
       }
-    } else {
-      skipped++;
     }
   }
 

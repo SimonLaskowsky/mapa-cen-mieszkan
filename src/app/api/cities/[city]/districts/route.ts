@@ -9,6 +9,13 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { city } = await params;
+    const { searchParams } = new URL(request.url);
+    const offerType = searchParams.get('offerType') || 'sale';
+
+    if (offerType !== 'sale' && offerType !== 'rent') {
+      return NextResponse.json({ error: 'Invalid offerType' }, { status: 400 });
+    }
+
     const supabase = createServerClient();
 
     // Fetch latest stats for all districts in the city
@@ -16,6 +23,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .from('latest_district_stats')
       .select('*')
       .eq('city', city.toLowerCase())
+      .eq('offer_type', offerType)
       .returns<LatestDistrictStats[]>();
 
     if (statsError) {
@@ -28,6 +36,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .from('district_price_changes')
       .select('*')
       .eq('city', city.toLowerCase())
+      .eq('offer_type', offerType)
       .returns<DistrictPriceChange[]>();
 
     if (changesError) {
@@ -52,7 +61,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
       return {
         district: stat.district,
+        offerType: stat.offer_type,
         date: stat.date,
+        avgPrice: stat.avg_price,
         avgPriceM2: stat.avg_price_m2,
         medianPriceM2: stat.median_price_m2,
         minPriceM2: stat.min_price_m2,

@@ -4,14 +4,21 @@ import { formatPercent, type CityData } from '@/lib/city-data';
 import TrendChart from './TrendChart';
 import ListingsPanel from './ListingsPanel';
 
+interface HoveredListing {
+  id: string;
+  lat: number;
+  lng: number;
+}
+
 interface StatsPanelProps {
   cityData: CityData;
   citySlug: string;
   selectedDistrict: string | null;
   onDistrictSelect: (district: string | null) => void;
+  onListingHover?: (listing: HoveredListing | null) => void;
 }
 
-export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDistrictSelect }: StatsPanelProps) {
+export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDistrictSelect, onListingHover }: StatsPanelProps) {
   const handleDistrictClick = (districtName: string) => {
     const newSelected = selectedDistrict === districtName ? null : districtName;
     onDistrictSelect(newSelected);
@@ -82,6 +89,7 @@ export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDis
           <ListingsPanel
             city={citySlug}
             district={selectedDistrict}
+            onListingHover={(listing) => onListingHover?.(listing ? { id: listing.id, lat: listing.lat, lng: listing.lng } : null)}
             onClose={() => onDistrictSelect(null)}
           />
         </div>

@@ -16,6 +16,7 @@ interface Listing {
   rooms: number | null;
   url: string;
   title: string | null;
+  thumbnailUrl: string | null;
   scrapedAt: string;
 }
 
@@ -111,64 +112,53 @@ export default function ListingsPanel({ city, district, onListingHover, onClose 
                 href={listing.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block p-3 hover:bg-[#00d4aa08] transition-colors group"
+                className="flex gap-3 p-3 hover:bg-[#00d4aa08] transition-colors group"
                 onMouseEnter={() => onListingHover?.(listing)}
                 onMouseLeave={() => onListingHover?.(null)}
               >
-                {/* Title / Address */}
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex-1 min-w-0">
+                {/* Thumbnail */}
+                {listing.thumbnailUrl && (
+                  <div className="flex-shrink-0">
+                    <img
+                      src={listing.thumbnailUrl}
+                      alt=""
+                      className="w-16 h-12 object-cover rounded border border-[#00d4aa20]"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  </div>
+                )}
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  {/* Title / Address */}
+                  <div className="flex items-start justify-between gap-2 mb-1">
                     <p className="font-mono text-xs text-gray-300 truncate group-hover:text-[#00d4aa] transition-colors">
                       {listing.address || listing.title || 'No address'}
                     </p>
-                  </div>
-                  <span className="font-mono text-[10px] text-gray-600 flex-shrink-0">
-                    {formatDate(listing.scrapedAt)}
-                  </span>
-                </div>
-
-                {/* Details */}
-                <div className="flex items-center gap-3 text-xs">
-                  {/* Price */}
-                  <div className="flex items-center gap-1">
-                    <span className="text-[#00d4aa] font-mono font-semibold">
-                      {formatPrice(listing.price)} zł
+                    <span className="font-mono text-[10px] text-gray-600 flex-shrink-0">
+                      {formatDate(listing.scrapedAt)}
                     </span>
                   </div>
 
-                  <span className="text-gray-700">|</span>
-
-                  {/* Size */}
-                  <div className="flex items-center gap-1">
+                  {/* Details */}
+                  <div className="flex items-center gap-2 text-xs flex-wrap">
+                    {/* Price */}
+                    <span className="text-[#00d4aa] font-mono font-semibold">
+                      {formatPrice(listing.price)} zł
+                    </span>
+                    <span className="text-gray-700">|</span>
                     <span className="text-gray-400 font-mono">{listing.sizeM2} m²</span>
-                  </div>
-
-                  {/* Rooms */}
-                  {listing.rooms && (
-                    <>
-                      <span className="text-gray-700">|</span>
-                      <div className="flex items-center gap-1">
+                    {listing.rooms && (
+                      <>
+                        <span className="text-gray-700">|</span>
                         <span className="text-gray-400 font-mono">{listing.rooms} rm</span>
-                      </div>
-                    </>
-                  )}
-
-                  <span className="text-gray-700">|</span>
-
-                  {/* Price per m2 */}
-                  <div className="flex items-center gap-1">
+                      </>
+                    )}
+                    <span className="text-gray-700">|</span>
                     <span className="text-gray-500 font-mono text-[10px]">
                       {formatPrice(Math.round(listing.pricePerM2))} zł/m²
                     </span>
                   </div>
-                </div>
-
-                {/* External link indicator */}
-                <div className="mt-2 flex items-center gap-1 text-[10px] text-gray-600">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                  <span>MORIZON</span>
                 </div>
               </a>
             ))}

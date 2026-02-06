@@ -1,0 +1,423 @@
+
+> mapa-cen-scraper@1.0.0 scrape /Users/szymonlaskowski/Documents/coding/mapa-cen-mieszkan/scraper
+> tsx src/index.ts
+
+[dotenv@17.2.3] injecting env (3) from ../.env.local -- tip: ⚙️  suppress all logs with { quiet: true }
+🏠 Mapa Cen Mieszkań - Daily Scraper
+
+📅 Started at: 2026-02-02T22:58:06.530Z
+🌆 Cities: warszawa, katowice
+💼 Offer types: sale, rent
+📄 Max pages per city: 20
+
+
+==================================================
+🏙️  Scraping WARSZAWA - SALE from Morizon
+==================================================
+
+🚀 Initializing Morizon scraper...
+📍 Loaded 19 district mappings for warszawa
+📄 Scraping page 1: https://www.morizon.pl/mieszkania/warszawa/
+   🍪 Accepted cookies
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 30, Inserted: 30
+📄 Scraping page 2: https://www.morizon.pl/mieszkania/warszawa/?page=2
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 33, Inserted: 33
+📄 Scraping page 3: https://www.morizon.pl/mieszkania/warszawa/?page=3
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 4: https://www.morizon.pl/mieszkania/warszawa/?page=4
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 36, Inserted: 36
+📄 Scraping page 5: https://www.morizon.pl/mieszkania/warszawa/?page=5
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 34, Inserted: 34
+📄 Scraping page 6: https://www.morizon.pl/mieszkania/warszawa/?page=6
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 30, Inserted: 30
+📄 Scraping page 7: https://www.morizon.pl/mieszkania/warszawa/?page=7
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 36, Inserted: 36
+📄 Scraping page 8: https://www.morizon.pl/mieszkania/warszawa/?page=8
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 9: https://www.morizon.pl/mieszkania/warszawa/?page=9
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 35, Inserted: 35
+📄 Scraping page 10: https://www.morizon.pl/mieszkania/warszawa/?page=10
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 33, Inserted: 33
+📄 Scraping page 11: https://www.morizon.pl/mieszkania/warszawa/?page=11
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 36, Inserted: 36
+📄 Scraping page 12: https://www.morizon.pl/mieszkania/warszawa/?page=12
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 31, Inserted: 31
+📄 Scraping page 13: https://www.morizon.pl/mieszkania/warszawa/?page=13
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 36, Inserted: 36
+📄 Scraping page 14: https://www.morizon.pl/mieszkania/warszawa/?page=14
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 34, Inserted: 34
+📄 Scraping page 15: https://www.morizon.pl/mieszkania/warszawa/?page=15
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 35, Inserted: 35
+📄 Scraping page 16: https://www.morizon.pl/mieszkania/warszawa/?page=16
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 36, Inserted: 36
+📄 Scraping page 17: https://www.morizon.pl/mieszkania/warszawa/?page=17
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 33, Inserted: 33
+📄 Scraping page 18: https://www.morizon.pl/mieszkania/warszawa/?page=18
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 36, Inserted: 36
+📄 Scraping page 19: https://www.morizon.pl/mieszkania/warszawa/?page=19
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 20: https://www.morizon.pl/mieszkania/warszawa/?page=20
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+
+==================================================
+🏙️  Scraping WARSZAWA - RENT from Morizon
+==================================================
+
+🚀 Initializing Morizon scraper...
+📍 Loaded 19 district mappings for warszawa
+📄 Scraping page 1: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 2: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=2
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 35, Inserted: 35
+📄 Scraping page 3: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=3
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 4: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=4
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 5: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=5
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 6: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=6
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 7: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=7
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 8: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=8
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 9: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=9
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 10: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=10
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 11: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=11
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+Error inserting listings: ON CONFLICT DO UPDATE command cannot affect row a second time
+   Processed: 36, Inserted: 0
+📄 Scraping page 12: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=12
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 13: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=13
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 14: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=14
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 15: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=15
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 16: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=16
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 17: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=17
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 18: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=18
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 19: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=19
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 20: https://www.morizon.pl/do-wynajecia/mieszkania/warszawa/?page=20
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+
+==================================================
+🏙️  Scraping KATOWICE - SALE from Morizon
+==================================================
+
+🚀 Initializing Morizon scraper...
+📍 Loaded 24 district mappings for katowice
+📄 Scraping page 1: https://www.morizon.pl/mieszkania/katowice/
+   🍪 Accepted cookies
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+Error inserting listings: ON CONFLICT DO UPDATE command cannot affect row a second time
+   Processed: 16, Inserted: 0
+📄 Scraping page 2: https://www.morizon.pl/mieszkania/katowice/?page=2
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 21, Inserted: 21
+📄 Scraping page 3: https://www.morizon.pl/mieszkania/katowice/?page=3
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 33, Inserted: 33
+📄 Scraping page 4: https://www.morizon.pl/mieszkania/katowice/?page=4
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 5: https://www.morizon.pl/mieszkania/katowice/?page=5
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 34, Inserted: 34
+📄 Scraping page 6: https://www.morizon.pl/mieszkania/katowice/?page=6
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 28, Inserted: 28
+📄 Scraping page 7: https://www.morizon.pl/mieszkania/katowice/?page=7
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+📄 Scraping page 8: https://www.morizon.pl/mieszkania/katowice/?page=8
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 17, Inserted: 17
+📄 Scraping page 9: https://www.morizon.pl/mieszkania/katowice/?page=9
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 32, Inserted: 32
+📄 Scraping page 10: https://www.morizon.pl/mieszkania/katowice/?page=10
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 32, Inserted: 32
+📄 Scraping page 11: https://www.morizon.pl/mieszkania/katowice/?page=11
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 33, Inserted: 33
+📄 Scraping page 12: https://www.morizon.pl/mieszkania/katowice/?page=12
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 26, Inserted: 26
+📄 Scraping page 13: https://www.morizon.pl/mieszkania/katowice/?page=13
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 17, Inserted: 17
+📄 Scraping page 14: https://www.morizon.pl/mieszkania/katowice/?page=14
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 24, Inserted: 24
+📄 Scraping page 15: https://www.morizon.pl/mieszkania/katowice/?page=15
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 20, Inserted: 20
+📄 Scraping page 16: https://www.morizon.pl/mieszkania/katowice/?page=16
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 19, Inserted: 19
+📄 Scraping page 17: https://www.morizon.pl/mieszkania/katowice/?page=17
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 26, Inserted: 26
+📄 Scraping page 18: https://www.morizon.pl/mieszkania/katowice/?page=18
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 30, Inserted: 30
+📄 Scraping page 19: https://www.morizon.pl/mieszkania/katowice/?page=19
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 34, Inserted: 34
+📄 Scraping page 20: https://www.morizon.pl/mieszkania/katowice/?page=20
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 37, Inserted: 37
+
+==================================================
+🏙️  Scraping KATOWICE - RENT from Morizon
+==================================================
+
+🚀 Initializing Morizon scraper...
+📍 Loaded 24 district mappings for katowice
+📄 Scraping page 1: https://www.morizon.pl/do-wynajecia/mieszkania/katowice/
+   🍪 Accepted cookies
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+Error inserting listings: ON CONFLICT DO UPDATE command cannot affect row a second time
+   Processed: 28, Inserted: 0
+📄 Scraping page 2: https://www.morizon.pl/do-wynajecia/mieszkania/katowice/?page=2
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 24, Inserted: 24
+📄 Scraping page 3: https://www.morizon.pl/do-wynajecia/mieszkania/katowice/?page=3
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 23, Inserted: 23
+📄 Scraping page 4: https://www.morizon.pl/do-wynajecia/mieszkania/katowice/?page=4
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 29, Inserted: 29
+📄 Scraping page 5: https://www.morizon.pl/do-wynajecia/mieszkania/katowice/?page=5
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 20, Inserted: 20
+📄 Scraping page 6: https://www.morizon.pl/do-wynajecia/mieszkania/katowice/?page=6
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 26, Inserted: 26
+📄 Scraping page 7: https://www.morizon.pl/do-wynajecia/mieszkania/katowice/?page=7
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 27, Inserted: 27
+📄 Scraping page 8: https://www.morizon.pl/do-wynajecia/mieszkania/katowice/?page=8
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 20, Inserted: 20
+📄 Scraping page 9: https://www.morizon.pl/do-wynajecia/mieszkania/katowice/?page=9
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 18, Inserted: 18
+📄 Scraping page 10: https://www.morizon.pl/do-wynajecia/mieszkania/katowice/?page=10
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 25, Inserted: 25
+📄 Scraping page 11: https://www.morizon.pl/do-wynajecia/mieszkania/katowice/?page=11
+   ✓ Property cards loaded
+   [DEBUG] Found 37 [data-cy="card"] containers
+   Found 37 listings
+   Processed: 11, Inserted: 11
+📄 Scraping page 12: https://www.morizon.pl/do-wynajecia/mieszkania/katowice/?page=12
+   ✓ Property cards loaded
+   [DEBUG] Found 26 [data-cy="card"] containers
+   Found 26 listings
+   Processed: 7, Inserted: 7
+📄 Scraping page 13: https://www.morizon.pl/do-wynajecia/mieszkania/katowice/?page=13
+   ⚠️ Property cards not found, waiting longer...
+   [DEBUG] Found 0 [data-cy="card"] containers
+   Found 0 listings
+📭 No more listings found, stopping
+
+==================================================
+📊 SUMMARY
+==================================================
+  warszawa (sale): 740 scraped, 692 inserted
+  warszawa (rent): 740 scraped, 701 inserted
+  katowice (sale): 740 scraped, 537 inserted
+  katowice (rent): 433 scraped, 230 inserted
+
+  TOTAL: 2653 scraped, 2160 inserted
+
+📅 Completed at: 2026-02-02T23:05:29.874Z

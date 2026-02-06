@@ -15,6 +15,7 @@ interface ListingRow {
   rooms: number | null;
   url: string;
   title: string | null;
+  thumbnail_url: string | null;
   scraped_at: string;
 }
 
@@ -23,13 +24,20 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const city = searchParams.get('city');
     const district = searchParams.get('district');
+    const offerType = searchParams.get('offerType') || 'sale';
     const limit = parseInt(searchParams.get('limit') || '50', 10);
     const minPrice = searchParams.get('minPrice');
     const maxPrice = searchParams.get('maxPrice');
+    const minSize = searchParams.get('minSize');
+    const maxSize = searchParams.get('maxSize');
     const rooms = searchParams.get('rooms'); // comma-separated: "1,2,3"
 
     if (!city) {
       return NextResponse.json({ error: 'City is required' }, { status: 400 });
+    }
+
+    if (offerType !== 'sale' && offerType !== 'rent') {
+      return NextResponse.json({ error: 'Invalid offerType' }, { status: 400 });
     }
 
     const supabase = createServerClient();
@@ -37,8 +45,9 @@ export async function GET(request: NextRequest) {
     // Build query
     let query = supabase
       .from('listings')
-      .select('id, external_id, city, district, address, lat, lng, price, size_m2, price_per_m2, rooms, url, title, scraped_at')
+      .select('id, external_id, city, district, address, lat, lng, price, size_m2, price_per_m2, rooms, url, title, thumbnail_url, scraped_at, offer_type')
       .eq('city', city.toLowerCase())
+      .eq('offer_type', offerType)
       .not('lat', 'is', null)
       .not('lng', 'is', null)
       .order('scraped_at', { ascending: false })
@@ -55,6 +64,14 @@ export async function GET(request: NextRequest) {
 
     if (maxPrice) {
       query = query.lte('price', parseInt(maxPrice, 10));
+    }
+
+    if (minSize) {
+      query = query.gte('size_m2', parseInt(minSize, 10));
+    }
+
+    if (maxSize) {
+      query = query.lte('size_m2', parseInt(maxSize, 10));
     }
 
     if (rooms) {
@@ -84,6 +101,7 @@ export async function GET(request: NextRequest) {
       rooms: listing.rooms,
       url: listing.url,
       title: listing.title,
+      thumbnailUrl: listing.thumbnail_url,
       scrapedAt: listing.scraped_at,
     })) || [];
 

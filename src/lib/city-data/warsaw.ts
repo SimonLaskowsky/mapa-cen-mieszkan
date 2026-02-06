@@ -4,6 +4,8 @@ import rawGeoJSON from '@/data/warsaw-districts.json';
 
 export interface DistrictStats {
   district: string;
+  offerType?: string;
+  avgPrice?: number;
   avgPriceM2: number;
   medianPriceM2: number;
   listingCount: number;
