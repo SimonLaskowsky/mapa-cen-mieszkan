@@ -6,8 +6,10 @@ import Legend from '@/components/Legend';
 import StatsPanel from '@/components/StatsPanel';
 import CitySelector from '@/components/CitySelector';
 import AddressSearch from '@/components/AddressSearch';
+import CountUp from '@/components/CountUp';
 import { CITIES } from '@/lib/cities';
 import { useDistrictData } from '@/lib/useDistrictData';
+import { useSoundEffects } from '@/lib/useSoundEffects';
 
 interface SearchLocation {
   lat: number;
@@ -21,6 +23,9 @@ const CITY_API_SLUGS: Record<string, string> = {
   krakow: 'krakow',
   wroclaw: 'wroclaw',
   katowice: 'katowice',
+  gdansk: 'gdansk',
+  poznan: 'poznan',
+  lodz: 'lodz',
 };
 
 // Get tier color for legend
@@ -54,6 +59,8 @@ export default function Home() {
   const [showListings, setShowListings] = useState(true);
   const [showDistrictLabels, setShowDistrictLabels] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showDistrictFill, setShowDistrictFill] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   // Listing filters
   const [minPrice, setMinPrice] = useState<string>('');
@@ -79,16 +86,22 @@ export default function Home() {
 
   const cityConfig = CITIES[currentCity];
   const { data: cityData, loading, error, updatedAt } = useDistrictData(currentCity, offerType);
+  const { playSound, setEnabled } = useSoundEffects();
+
+  // Sync sound enabled state
+  useEffect(() => {
+    setEnabled(soundEnabled);
+  }, [soundEnabled, setEnabled]);
 
   // Calculate city-wide stats
   const cityStats = useMemo(() => {
     if (!cityData) {
-      return { avgPrice: 0, totalListings: 0, avgChange: 0, highest: null, lowest: null, districtCount: 0 };
+      return { avgPrice: 0, totalListings: 0, avgChange: 0, highest: null, lowest: null, districtCount: 0, avgYield: 0 };
     }
 
     const stats = Object.values(cityData.DISTRICT_STATS);
     if (stats.length === 0) {
-      return { avgPrice: 0, totalListings: 0, avgChange: 0, highest: null, lowest: null, districtCount: 0 };
+      return { avgPrice: 0, totalListings: 0, avgChange: 0, highest: null, lowest: null, districtCount: 0, avgYield: 0 };
     }
 
     // Use avgPrice for rent, avgPriceM2 for sale
@@ -101,7 +114,13 @@ export default function Home() {
     const highest = sorted[0];
     const lowest = sorted[sorted.length - 1];
 
-    return { avgPrice, totalListings, avgChange, highest, lowest, districtCount: stats.length };
+    // Average rental yield
+    const yieldsWithData = stats.filter(s => s.rentalYield != null && s.rentalYield > 0);
+    const avgYield = yieldsWithData.length > 0
+      ? yieldsWithData.reduce((sum, s) => sum + s.rentalYield!, 0) / yieldsWithData.length
+      : 0;
+
+    return { avgPrice, totalListings, avgChange, highest, lowest, districtCount: stats.length, avgYield };
   }, [cityData, offerType]);
 
   const [timeString, setTimeString] = useState<string | null>(null);
@@ -142,6 +161,7 @@ export default function Home() {
             <CitySelector
                 currentCity={currentCity}
                 onCityChange={(city) => {
+                  playSound('swoosh');
                   setCurrentCity(city);
                   setSearchLocation(null);
                   setFocusedDistrict(null);
@@ -221,7 +241,7 @@ export default function Home() {
                   <span className="font-mono text-[10px] text-gray-500 uppercase">Offer Type</span>
                   <div className="flex gap-1">
                     <button
-                      onClick={() => setOfferType('sale')}
+                      onClick={() => { playSound('click'); setOfferType('sale'); }}
                       className={`flex-1 px-2 py-1.5 rounded font-mono text-[10px] transition-colors ${
                         offerType === 'sale'
                           ? 'bg-[#00d4aa] text-black'
@@ -231,7 +251,7 @@ export default function Home() {
                       BUY
                     </button>
                     <button
-                      onClick={() => setOfferType('rent')}
+                      onClick={() => { playSound('click'); setOfferType('rent'); }}
                       className={`flex-1 px-2 py-1.5 rounded font-mono text-[10px] transition-colors ${
                         offerType === 'rent'
                           ? 'bg-[#00d4aa] text-black'
@@ -253,11 +273,14 @@ export default function Home() {
                     <input type="checkbox" checked={showListings} onChange={(e) => setShowListings(e.target.checked)} className="accent-[#00d4aa] w-3 h-3" />
                     <span className="font-mono text-[10px] text-gray-400 group-hover:text-white">LISTINGS</span>
                   </label>
-                  {/* Heatmap toggle hidden - kept for future use */}
-                  {/* <label className="flex items-center gap-2 cursor-pointer group">
-                    <input type="checkbox" checked={showHeatmap} onChange={(e) => setShowHeatmap(e.target.checked)} className="accent-[#00d4aa] w-3 h-3" />
-                    <span className="font-mono text-[10px] text-gray-400 group-hover:text-white">PRICE HEATMAP</span>
-                  </label> */}
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input type="checkbox" checked={showDistrictFill} onChange={(e) => setShowDistrictFill(e.target.checked)} className="accent-[#00d4aa] w-3 h-3" />
+                    <span className="font-mono text-[10px] text-gray-400 group-hover:text-white">PRICE OVERLAY</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input type="checkbox" checked={soundEnabled} onChange={(e) => setSoundEnabled(e.target.checked)} className="accent-[#00d4aa] w-3 h-3" />
+                    <span className="font-mono text-[10px] text-gray-400 group-hover:text-white">SOUND FX</span>
+                  </label>
                 </div>
               </div>
             )}
@@ -327,6 +350,7 @@ export default function Home() {
                       <button
                         key={room}
                         onClick={() => {
+                          playSound('pop');
                           setSelectedRooms(prev =>
                             prev.includes(room)
                               ? prev.filter(r => r !== room)
@@ -349,6 +373,7 @@ export default function Home() {
                 {(minPrice || maxPrice || minSize || maxSize || selectedRooms.length > 0) && (
                   <button
                     onClick={() => {
+                      playSound('swoosh');
                       setMinPrice('');
                       setMaxPrice('');
                       setMinSize('');
@@ -434,6 +459,7 @@ export default function Home() {
                 showListings={showListings}
                 showDistrictLabels={showDistrictLabels}
                 showHeatmap={showHeatmap}
+                showDistrictFill={showDistrictFill}
                 listingFilters={listingFilters}
                 hoveredListingId={hoveredListing?.id}
               />
@@ -485,23 +511,34 @@ export default function Home() {
                 <div>
                   <p className="tactical-label">{offerType === 'sale' ? 'AVG PRICE / M²' : 'AVG RENT / MONTH'}</p>
                   <p className="font-mono text-lg text-[#00d4aa] data-glow">
-                    {cityStats.avgPrice.toLocaleString('pl-PL')} PLN
+                    <CountUp value={cityStats.avgPrice} separator=" " /> PLN
                   </p>
                 </div>
                 <div className="h-8 w-px bg-[#00d4aa20]" />
                 <div>
                   <p className="tactical-label">ACTIVE LISTINGS</p>
                   <p className="font-mono text-lg text-white">
-                    {cityStats.totalListings.toLocaleString('pl-PL')}
+                    <CountUp value={cityStats.totalListings} separator=" " />
                   </p>
                 </div>
                 <div className="h-8 w-px bg-[#00d4aa20]" />
                 <div>
                   <p className="tactical-label">30D CHANGE</p>
                   <p className={`font-mono text-lg ${cityStats.avgChange >= 0 ? 'text-red-400' : 'text-green-400'}`}>
-                    {cityStats.avgChange >= 0 ? '+' : ''}{cityStats.avgChange.toFixed(1)}%
+                    {cityStats.avgChange >= 0 ? '+' : ''}<CountUp value={Math.abs(cityStats.avgChange)} decimals={1} />%
                   </p>
                 </div>
+                {cityStats.avgYield > 0 && (
+                  <>
+                    <div className="h-8 w-px bg-[#00d4aa20]" />
+                    <div>
+                      <p className="tactical-label">AVG YIELD</p>
+                      <p className={`font-mono text-lg ${cityStats.avgYield >= 5 ? 'text-green-400' : cityStats.avgYield >= 4 ? 'text-yellow-400' : 'text-orange-400'}`}>
+                        <CountUp value={cityStats.avgYield} decimals={1} />%
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="flex items-center gap-6">

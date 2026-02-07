@@ -5,6 +5,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { CITIES, findCityAtPoint } from '@/lib/cities';
 import { formatPrice, formatPercent, type DistrictStats, type CityData } from '@/lib/city-data';
+import { useSoundEffects } from '@/lib/useSoundEffects';
 
 interface Listing {
   id: string;
@@ -31,6 +32,9 @@ const CITY_API_SLUGS: Record<string, string> = {
   krakow: 'krakow',
   wroclaw: 'wroclaw',
   katowice: 'katowice',
+  gdansk: 'gdansk',
+  poznan: 'poznan',
+  lodz: 'lodz',
 };
 
 interface SearchLocation {
@@ -59,6 +63,7 @@ interface MapProps {
   showListings?: boolean;
   showDistrictLabels?: boolean;
   showHeatmap?: boolean;
+  showDistrictFill?: boolean;
   listingFilters?: ListingFilters;
   hoveredListingId?: string;
 }
@@ -132,7 +137,7 @@ function getPriceThreatLevel(price: number, offerType: 'sale' | 'rent' = 'sale')
   }
 }
 
-export default function Map({ cityId, cityData, offerType = 'sale', onCityChange, onDistrictSelect, searchLocation, focusedDistrict, onDistrictClick, showListings = true, showDistrictLabels = true, showHeatmap = true, listingFilters, hoveredListingId }: MapProps) {
+export default function Map({ cityId, cityData, offerType = 'sale', onCityChange, onDistrictSelect, searchLocation, focusedDistrict, onDistrictClick, showListings = true, showDistrictLabels = true, showHeatmap = true, showDistrictFill = true, listingFilters, hoveredListingId }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popup = useRef<maplibregl.Popup | null>(null);
@@ -146,6 +151,8 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
   const showDistrictLabelsRef = useRef(showDistrictLabels);
   const showListingsRef = useRef(showListings);
   const [listings, setListings] = useState<Listing[]>([]);
+  const { playSound } = useSoundEffects();
+  const playSoundRef = useRef(playSound);
 
   // Get current city config
   const cityConfig = CITIES[cityId];
@@ -158,6 +165,10 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
   useEffect(() => {
     onDistrictClickRef.current = onDistrictClick;
   }, [onDistrictClick]);
+
+  useEffect(() => {
+    playSoundRef.current = playSound;
+  }, [playSound]);
 
   useEffect(() => {
     showDistrictLabelsRef.current = showDistrictLabels;
@@ -303,6 +314,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
       // Click opens listing URL in background tab
       el.addEventListener('click', (e) => {
         e.stopPropagation();
+        playSound('ping');
         const a = document.createElement('a');
         a.href = listing.url;
         a.target = '_blank';
@@ -321,7 +333,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
 
       listingMarkersRef.current.push(marker);
     });
-  }, [clearListingMarkers]);
+  }, [clearListingMarkers, playSound]);
 
   // Add markers for districts
   const addMarkers = useCallback((mapInstance: maplibregl.Map, data: typeof cityData) => {
@@ -492,12 +504,12 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
         source: 'districts',
         paint: {
           'fill-color': ['get', 'color'],
-          'fill-opacity': [
+          'fill-opacity': showDistrictFill ? [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
             0.35,
             0.15
-          ],
+          ] : 0,
         },
       });
 
@@ -534,6 +546,13 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
 
         map.current.getCanvas().style.cursor = 'pointer';
 
+        const newId = e.features[0].id ?? null;
+
+        // Only play sound when entering a NEW district
+        if (newId !== hoveredId && newId !== null) {
+          playSoundRef.current('tick');
+        }
+
         if (hoveredId !== null) {
           map.current.setFeatureState(
             { source: 'districts', id: hoveredId },
@@ -541,7 +560,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
           );
         }
 
-        hoveredId = e.features[0].id ?? null;
+        hoveredId = newId;
         if (hoveredId !== null) {
           map.current.setFeatureState(
             { source: 'districts', id: hoveredId },
@@ -567,6 +586,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
       // Click handler
       map.current.on('click', 'district-fill', (e) => {
         if (!map.current || !popup.current || !e.features?.[0]) return;
+        playSoundRef.current('pop');
 
         const feature = e.features[0];
         const name = feature.properties?.name;
@@ -612,6 +632,10 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
                 <span style="color: rgba(255,255,255,0.5);">AVG SIZE</span>
                 <span style="color: white;">${stats.avgSize} m²</span>
               </div>
+              ${stats.rentalYield ? `<div style="display: flex; justify-content: space-between; gap: 4px;">
+                <span style="color: rgba(255,255,255,0.5);">GROSS YIELD</span>
+                <span style="color: ${stats.rentalYield >= 5 ? '#22c55e' : stats.rentalYield >= 4 ? '#eab308' : '#ef4444'}; font-weight: 600;">${stats.rentalYield.toFixed(1)}%</span>
+              </div>` : ''}
             </div>
           </div>
         `;
@@ -755,6 +779,10 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
             <span style="color: rgba(255,255,255,0.5);">AVG SIZE</span>
             <span style="color: white;">${stats.avgSize} m²</span>
           </div>
+          ${stats.rentalYield ? `<div style="display: flex; justify-content: space-between; gap: 4px;">
+            <span style="color: rgba(255,255,255,0.5);">GROSS YIELD</span>
+            <span style="color: ${stats.rentalYield >= 5 ? '#22c55e' : stats.rentalYield >= 4 ? '#eab308' : '#ef4444'}; font-weight: 600;">${stats.rentalYield.toFixed(1)}%</span>
+          </div>` : ''}
         </div>
       </div>
     `;
@@ -824,6 +852,11 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
         const listingsWithCoords = (data.listings || []).filter((l: Listing) => l.lat && l.lng);
         setListings(listingsWithCoords);
 
+        // Play success sound when listings load
+        if (listingsWithCoords.length > 0) {
+          playSound('success');
+        }
+
         if (map.current && listingsWithCoords.length > 0) {
           const avgPrice = districtStats?.avgPriceM2 || 1;
 
@@ -885,7 +918,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
     };
 
     fetchListings();
-  }, [focusedDistrict, cityId, offerType, clearListingMarkers, addListingMarkers, showListings, showHeatmap, listingFilters]);
+  }, [focusedDistrict, cityId, offerType, clearListingMarkers, addListingMarkers, showListings, showHeatmap, listingFilters, playSound]);
 
   // Toggle district labels visibility
   useEffect(() => {
@@ -908,6 +941,19 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
       map.current.setLayoutProperty('listings-heat', 'visibility', showHeatmap ? 'visible' : 'none');
     }
   }, [showHeatmap]);
+
+  // Toggle district fill visibility (keep borders)
+  useEffect(() => {
+    if (!map.current) return;
+    if (map.current.getLayer('district-fill')) {
+      map.current.setPaintProperty('district-fill', 'fill-opacity', showDistrictFill ? [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        0.35,
+        0.15
+      ] : 0);
+    }
+  }, [showDistrictFill]);
 
   // Highlight listing marker on hover from panel
   useEffect(() => {
@@ -934,6 +980,6 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
   }, [hoveredListingId]);
 
   return (
-    <div ref={mapContainer} className="map-container w-full h-full" />
+    <div ref={mapContainer} className="map-container map-crosshair w-full h-full" />
   );
 }

@@ -1,6 +1,6 @@
 import { MorizonScraper } from './scrapers/morizon.js';
 
-const CITIES = ['warszawa', 'katowice'];
+const CITIES = ['warszawa', 'katowice', 'gdansk', 'poznan', 'lodz'];
 const OFFER_TYPES: ('sale' | 'rent')[] = ['sale', 'rent'];
 const MAX_PAGES_PER_CITY = 20;
 

@@ -73,13 +73,13 @@ body {
 .tactical-panel-bottom::before {
   bottom: -1px;
   left: -1px;
-  border-width: 0 0 2px 2px;
+  border-width: 2px 0px 0px 2px;
 }
 
 .tactical-panel-bottom::after {
   bottom: -1px;
   right: -1px;
-  border-width: 0 2px 2px 0;
+  border-width: 2px 2px 0px 0px;
 }
 
 /* Status indicator pulse */
@@ -481,4 +481,120 @@ body {
 
 .listing-marker:hover {
   z-index: 1000 !important;
+}
+
+/* ============================================
+   CROSSHAIR CURSOR FOR MAP
+   ============================================ */
+.map-crosshair {
+  cursor: crosshair !important;
+}
+
+.map-crosshair * {
+  cursor: crosshair !important;
+}
+
+/* Custom animated crosshair overlay */
+.crosshair-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.crosshair-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  transform: translate(-50%, -50%);
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+
+.crosshair-overlay:hover .crosshair-center,
+.map-container:hover .crosshair-center {
+  opacity: 0.6;
+}
+
+.crosshair-h,
+.crosshair-v {
+  position: absolute;
+  background: var(--accent);
+}
+
+.crosshair-h {
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+.crosshair-v {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
+}
+
+.crosshair-gap-h {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 3px;
+  background: var(--background);
+  transform: translate(-50%, -50%);
+}
+
+.crosshair-gap-v {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 20px;
+  background: var(--background);
+  transform: translate(-50%, -50%);
+}
+
+/* ============================================
+   COUNT UP ANIMATION
+   ============================================ */
+.count-up {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+
+.count-up-glow {
+  animation: countGlow 0.3s ease-out;
+}
+
+@keyframes countGlow {
+  0% {
+    text-shadow: 0 0 20px var(--accent), 0 0 40px var(--accent);
+  }
+  100% {
+    text-shadow: none;
+  }
+}
+
+/* Flip animation for numbers */
+.number-flip {
+  display: inline-block;
+  animation: flipIn 0.15s ease-out;
+}
+
+@keyframes flipIn {
+  0% {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }

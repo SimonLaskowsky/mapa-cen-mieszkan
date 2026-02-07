@@ -11,6 +11,7 @@ export interface DistrictStats {
   listingCount: number;
   change30d: number;
   avgSize: number;
+  rentalYield?: number;
 }
 
 // Mock statistics for Warsaw districts (realistic 2025 prices)

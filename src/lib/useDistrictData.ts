@@ -8,12 +8,18 @@ import warsawGeoJSON from '@/data/warsaw-districts.json';
 import krakowGeoJSON from '@/data/krakow-districts.json';
 import wroclawGeoJSON from '@/data/wroclaw-districts.json';
 import katowiceGeoJSON from '@/data/katowice-districts.json';
+import gdanskGeoJSON from '@/data/gdansk-districts.json';
+import poznanGeoJSON from '@/data/poznan-districts.json';
+import lodzGeoJSON from '@/data/lodz-districts.json';
 
 const GEOJSON_MAP: Record<string, unknown> = {
   warszawa: warsawGeoJSON,
   krakow: krakowGeoJSON,
   wroclaw: wroclawGeoJSON,
   katowice: katowiceGeoJSON,
+  gdansk: gdanskGeoJSON,
+  poznan: poznanGeoJSON,
+  lodz: lodzGeoJSON,
 };
 
 // City slug mapping (frontend uses 'warsaw', API uses 'warszawa')
@@ -22,6 +28,9 @@ const CITY_SLUG_MAP: Record<string, string> = {
   krakow: 'krakow',
   wroclaw: 'wroclaw',
   katowice: 'katowice',
+  gdansk: 'gdansk',
+  poznan: 'poznan',
+  lodz: 'lodz',
 };
 
 interface APIDistrictData {
@@ -148,21 +157,58 @@ export function useDistrictData(cityId: string, offerType: 'sale' | 'rent' = 'sa
 
       try {
         const apiSlug = CITY_SLUG_MAP[cityId] || cityId;
-        const response = await fetch(`/api/cities/${apiSlug}/districts?offerType=${offerType}`);
+        const otherType = offerType === 'sale' ? 'rent' : 'sale';
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch: ${response.status}`);
+        // Fetch both offer types in parallel
+        const [primaryRes, secondaryRes] = await Promise.all([
+          fetch(`/api/cities/${apiSlug}/districts?offerType=${offerType}`),
+          fetch(`/api/cities/${apiSlug}/districts?offerType=${otherType}`),
+        ]);
+
+        if (!primaryRes.ok) {
+          throw new Error(`Failed to fetch: ${primaryRes.status}`);
         }
 
-        const apiData: APIResponse = await response.json();
+        const apiData: APIResponse = await primaryRes.json();
 
         // Check if we have any data
         if (!apiData.districts || apiData.districts.length === 0) {
-          // No data from API - could fall back to mock or show empty
           throw new Error('No data available for this city');
         }
 
         const transformed = transformAPIResponse(apiData, cityId);
+
+        // Compute rental yield if secondary data is available
+        if (secondaryRes.ok) {
+          const secondaryData: APIResponse = await secondaryRes.json();
+          if (secondaryData.districts && secondaryData.districts.length > 0) {
+            const secondaryByDistrict: Record<string, APIDistrictData> = {};
+            secondaryData.districts.forEach(d => {
+              secondaryByDistrict[d.district] = d;
+            });
+
+            Object.values(transformed.DISTRICT_STATS).forEach(stats => {
+              const other = secondaryByDistrict[stats.district];
+              if (!other) return;
+
+              // Get sale price/m² and rent price + size
+              const salePriceM2 = offerType === 'sale' ? stats.avgPriceM2 : (other.avgPriceM2 || 0);
+              const rentAvgPrice = offerType === 'rent' ? (stats.avgPrice || 0) : (other.avgPrice || 0);
+              const rentAvgSize = offerType === 'rent' ? (stats.avgSize || 0) : (other.avgSizeM2 || 0);
+
+              if (salePriceM2 > 0 && rentAvgPrice > 0 && rentAvgSize > 0) {
+                const rentPerM2 = rentAvgPrice / rentAvgSize;
+                stats.rentalYield = (rentPerM2 * 12) / salePriceM2 * 100;
+              }
+            });
+
+            // Also update yields in DISTRICT_CENTERS
+            transformed.DISTRICT_CENTERS.forEach(center => {
+              center.stats = transformed.DISTRICT_STATS[center.name];
+            });
+          }
+        }
+
         setData(transformed);
         setUpdatedAt(apiData.updatedAt);
       } catch (err) {

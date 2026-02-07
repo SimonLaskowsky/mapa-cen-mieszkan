@@ -72,8 +72,9 @@ async function seedDistricts() {
     { file: 'warsaw-districts.json', city: 'warszawa' },
     { file: 'krakow-districts.json', city: 'krakow' },
     { file: 'wroclaw-districts.json', city: 'wroclaw' },
-    // Gdansk is in TopoJSON format, needs conversion - skipping for now
-    // { file: 'gdansk-districts.json', city: 'gdansk' },
+    { file: 'gdansk-districts.json', city: 'gdansk' },
+    { file: 'poznan-districts.json', city: 'poznan' },
+    { file: 'lodz-districts.json', city: 'lodz' },
   ];
 
   console.log('🌍 Seeding districts table...\n');
