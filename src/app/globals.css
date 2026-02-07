@@ -18,6 +18,12 @@ body {
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
   min-height: 100vh;
   overflow: hidden;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cline x1='12' y1='0' x2='12' y2='9' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='12' y1='15' x2='12' y2='24' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='0' y1='12' x2='9' y2='12' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='15' y1='12' x2='24' y2='12' stroke='%2300d4aa' stroke-width='1'/%3E%3Ccircle cx='12' cy='12' r='4' fill='none' stroke='%2300d4aa' stroke-width='0.75' opacity='0.5'/%3E%3C/svg%3E") 12 12, crosshair;
+}
+
+/* Interactive elements keep pointer cursor */
+button, a, [role="button"], input, select, textarea, label[for], .maplibregl-ctrl button {
+  cursor: pointer !important;
 }
 
 /* Grid background */
@@ -509,11 +515,12 @@ body {
    CROSSHAIR CURSOR FOR MAP
    ============================================ */
 .map-crosshair {
-  cursor: crosshair !important;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cline x1='12' y1='0' x2='12' y2='9' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='12' y1='15' x2='12' y2='24' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='0' y1='12' x2='9' y2='12' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='15' y1='12' x2='24' y2='12' stroke='%2300d4aa' stroke-width='1'/%3E%3Ccircle cx='12' cy='12' r='4' fill='none' stroke='%2300d4aa' stroke-width='0.75' opacity='0.5'/%3E%3C/svg%3E") 12 12, crosshair !important;
 }
 
-.map-crosshair * {
-  cursor: crosshair !important;
+.map-crosshair *,
+.maplibregl-canvas {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cline x1='12' y1='0' x2='12' y2='9' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='12' y1='15' x2='12' y2='24' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='0' y1='12' x2='9' y2='12' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='15' y1='12' x2='24' y2='12' stroke='%2300d4aa' stroke-width='1'/%3E%3Ccircle cx='12' cy='12' r='4' fill='none' stroke='%2300d4aa' stroke-width='0.75' opacity='0.5'/%3E%3C/svg%3E") 12 12, crosshair !important;
 }
 
 /* Custom animated crosshair overlay */
