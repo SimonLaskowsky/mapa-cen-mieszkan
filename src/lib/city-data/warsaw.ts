@@ -8,6 +8,8 @@ export interface DistrictStats {
   avgPrice?: number;
   avgPriceM2: number;
   medianPriceM2: number;
+  minPriceM2?: number;
+  maxPriceM2?: number;
   listingCount: number;
   change30d: number;
   avgSize: number;

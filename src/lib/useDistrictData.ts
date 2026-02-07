@@ -93,6 +93,8 @@ function transformAPIResponse(response: APIResponse, cityId: string): CityData {
       avgPrice: d.avgPrice || 0,
       avgPriceM2: d.avgPriceM2 || 0,
       medianPriceM2: d.medianPriceM2 || 0,
+      minPriceM2: d.minPriceM2 || undefined,
+      maxPriceM2: d.maxPriceM2 || undefined,
       listingCount: d.listingCount || 0,
       change30d: d.change30d || 0,
       avgSize: d.avgSizeM2 || 0,

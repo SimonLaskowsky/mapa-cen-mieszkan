@@ -150,6 +150,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
   const onDistrictClickRef = useRef(onDistrictClick);
   const showDistrictLabelsRef = useRef(showDistrictLabels);
   const showListingsRef = useRef(showListings);
+  const offerTypeRef = useRef(offerType);
   const [listings, setListings] = useState<Listing[]>([]);
   const { playSound } = useSoundEffects();
   const playSoundRef = useRef(playSound);
@@ -169,6 +170,10 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
   useEffect(() => {
     playSoundRef.current = playSound;
   }, [playSound]);
+
+  useEffect(() => {
+    offerTypeRef.current = offerType;
+  }, [offerType]);
 
   useEffect(() => {
     showDistrictLabelsRef.current = showDistrictLabels;
@@ -352,11 +357,18 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
 
       const el = document.createElement('div');
       el.className = 'district-marker';
+      const minPrice = stats.minPriceM2;
+      const maxPrice = stats.maxPriceM2;
+      const rangeHtml = minPrice && maxPrice && offerType === 'sale'
+        ? `<div class="marker-range"><span class="marker-range-low">${(minPrice / 1000).toFixed(1)}k</span><span class="marker-range-sep">–</span><span class="marker-range-high">${(maxPrice / 1000).toFixed(1)}k</span></div>`
+        : '';
+
       el.innerHTML = `
         <div class="district-marker-content" style="--tier-color: ${color};">
           <div class="marker-name">${displayName}</div>
           <div class="marker-bars" style="color: ${color};">${bars}</div>
           <div class="marker-price">${(displayPrice / 1000).toFixed(1)}k</div>
+          ${rangeHtml}
           <div class="marker-meta">
             <span class="marker-listings">${stats.listingCount}</span>
             <span class="marker-change" style="color: ${changeColor};">${changeIcon}${Math.abs(stats.change30d).toFixed(1)}%</span>
@@ -381,7 +393,8 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
       type: 'FeatureCollection' as const,
       features: data.DISTRICTS_GEOJSON.features.map((feature) => {
         const stats = data.DISTRICT_STATS[feature.properties.name];
-        const tier = stats ? getPriceTier(stats.avgPriceM2) : 3;
+        const displayPrice = stats ? (offerType === 'rent' ? (stats.avgPrice || 0) : stats.avgPriceM2) : 0;
+        const tier = stats ? getPriceTier(displayPrice, offerType) : 3;
         return {
           type: 'Feature' as const,
           id: feature.id,
@@ -478,7 +491,8 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
         type: 'FeatureCollection' as const,
         features: cityData.DISTRICTS_GEOJSON.features.map((feature) => {
           const stats = cityData.DISTRICT_STATS[feature.properties.name];
-          const tier = stats ? getPriceTier(stats.avgPriceM2) : 3;
+          const displayPrice = stats ? (offerType === 'rent' ? (stats.avgPrice || 0) : stats.avgPriceM2) : 0;
+          const tier = stats ? getPriceTier(displayPrice, offerType) : 3;
           return {
             type: 'Feature' as const,
             id: feature.id,
@@ -597,13 +611,18 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
 
         const stats = districtData.stats;
         const coordinates = e.lngLat;
-        const tier = getPriceTier(stats.avgPriceM2);
+        const currentOfferType = offerTypeRef.current;
+        const popupDisplayPrice = currentOfferType === 'rent' ? (stats.avgPrice || 0) : stats.avgPriceM2;
+        const tier = getPriceTier(popupDisplayPrice, currentOfferType);
         const tierColor = getTierColor(tier);
         const displayName = districtData.displayName || districtData.name;
 
         const changeColor = stats.change30d >= 0 ? '#ef4444' : '#22c55e';
         const changeIcon = stats.change30d >= 0 ? '▲' : '▼';
-        const threatLevel = getPriceThreatLevel(stats.avgPriceM2);
+        const threatLevel = getPriceThreatLevel(popupDisplayPrice, currentOfferType);
+
+        const priceLabel = currentOfferType === 'rent' ? 'AVG RENT/MONTH' : 'AVG PRICE/M²';
+        const medianLabel = currentOfferType === 'rent' ? 'MEDIAN RENT' : 'MEDIAN/M²';
 
         const html = `
           <div style="font-family: ui-monospace, monospace;">
@@ -613,12 +632,12 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
             </div>
             <div style="display: grid; gap: 8px; font-size: 12px;">
               <div style="display: flex; justify-content: space-between; gap: 4px;">
-                <span style="color: rgba(255,255,255,0.5);">AVG PRICE/M²</span>
-                <span style="color: ${tierColor}; font-weight: 600;">${formatPrice(stats.avgPriceM2)}</span>
+                <span style="color: rgba(255,255,255,0.5);">${priceLabel}</span>
+                <span style="color: ${tierColor}; font-weight: 600;">${formatPrice(popupDisplayPrice)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 4px;">
-                <span style="color: rgba(255,255,255,0.5);">MEDIAN</span>
-                <span style="color: white;">${formatPrice(stats.medianPriceM2)}</span>
+                <span style="color: rgba(255,255,255,0.5);">${medianLabel}</span>
+                <span style="color: white;">${formatPrice(currentOfferType === 'rent' ? (stats.medianPriceM2 * (stats.avgSize || 50)) : stats.medianPriceM2)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 4px;">
                 <span style="color: rgba(255,255,255,0.5);">30D CHANGE</span>
@@ -744,13 +763,18 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
 
     const stats = districtData.stats;
     const coordinates: [number, number] = [districtData.lng, districtData.lat];
-    const tier = getPriceTier(stats.avgPriceM2);
+    const currentOfferType = offerTypeRef.current;
+    const popupDisplayPrice = currentOfferType === 'rent' ? (stats.avgPrice || 0) : stats.avgPriceM2;
+    const tier = getPriceTier(popupDisplayPrice, currentOfferType);
     const tierColor = getTierColor(tier);
     const displayName = districtData.displayName || districtData.name;
 
     const changeColor = stats.change30d >= 0 ? '#ef4444' : '#22c55e';
     const changeIcon = stats.change30d >= 0 ? '▲' : '▼';
-    const threatLevel = getPriceThreatLevel(stats.avgPriceM2);
+    const threatLevel = getPriceThreatLevel(popupDisplayPrice, currentOfferType);
+
+    const priceLabel = currentOfferType === 'rent' ? 'AVG RENT/MONTH' : 'AVG PRICE/M²';
+    const medianLabel = currentOfferType === 'rent' ? 'MEDIAN RENT' : 'MEDIAN/M²';
 
     const html = `
       <div style="font-family: ui-monospace, monospace;">
@@ -760,12 +784,12 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
         </div>
         <div style="display: grid; gap: 8px; font-size: 12px;">
           <div style="display: flex; justify-content: space-between; gap: 4px;">
-            <span style="color: rgba(255,255,255,0.5);">AVG PRICE/M²</span>
-            <span style="color: ${tierColor}; font-weight: 600;">${formatPrice(stats.avgPriceM2)}</span>
+            <span style="color: rgba(255,255,255,0.5);">${priceLabel}</span>
+            <span style="color: ${tierColor}; font-weight: 600;">${formatPrice(popupDisplayPrice)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; gap: 4px;">
-            <span style="color: rgba(255,255,255,0.5);">MEDIAN</span>
-            <span style="color: white;">${formatPrice(stats.medianPriceM2)}</span>
+            <span style="color: rgba(255,255,255,0.5);">${medianLabel}</span>
+            <span style="color: white;">${formatPrice(currentOfferType === 'rent' ? (stats.medianPriceM2 * (stats.avgSize || 50)) : stats.medianPriceM2)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; gap: 4px;">
             <span style="color: rgba(255,255,255,0.5);">30D CHANGE</span>
