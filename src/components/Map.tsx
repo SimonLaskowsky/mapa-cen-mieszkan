@@ -248,7 +248,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
         width: 0;
         height: 0;
         cursor: pointer;
-        z-index: ${100 + index};
+        z-index: ${index + 1};
       `;
       el.innerHTML = `
         <div class="listing-marker-dot" style="
@@ -1019,6 +1019,9 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
 
       if (isIgnored) {
         el.style.filter = 'grayscale(1)';
+        dot.style.border = '2px solid #05080a';
+        dot.style.boxShadow = '0 0 8px rgba(0,212,170,0.6)';
+        dot.style.transform = 'rotate(45deg) scale(1)';
         if (pulse) pulse.style.display = 'none';
       } else if (isFavourite) {
         el.style.filter = 'none';
@@ -1067,11 +1070,11 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
         dot.style.transform = 'rotate(45deg) scale(1.5)';
         dot.style.boxShadow = '0 0 20px rgba(0,212,170,1)';
       }
-      el.style.zIndex = '1000';
+      el.style.zIndex = '50';
     }
   }, [hoveredListingId, ignoredListings, favouriteListings]);
 
   return (
-    <div ref={mapContainer} className="map-container map-crosshair w-full h-full" />
+    <div ref={mapContainer} className="map-container map-crosshair w-full h-full isolate" />
   );
 }

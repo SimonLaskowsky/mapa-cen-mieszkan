@@ -25,6 +25,7 @@ type ListingFilter = 'all' | 'favs' | 'hide-ignored';
 interface ListingsPanelProps {
   city: string;
   district: string;
+  offerType: 'sale' | 'rent';
   onListingHover?: (listing: Listing | null) => void;
   onClose: () => void;
   ignoredListings?: Set<string>;
@@ -33,7 +34,7 @@ interface ListingsPanelProps {
   onFavourite?: (id: string) => void;
 }
 
-export default function ListingsPanel({ city, district, onListingHover, onClose, ignoredListings, favouriteListings, onIgnore, onFavourite }: ListingsPanelProps) {
+export default function ListingsPanel({ city, district, offerType, onListingHover, onClose, ignoredListings, favouriteListings, onIgnore, onFavourite }: ListingsPanelProps) {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +46,7 @@ export default function ListingsPanel({ city, district, onListingHover, onClose,
       setError(null);
 
       try {
-        const response = await fetch(`/api/listings?city=${city}&district=${district}&limit=20`);
+        const response = await fetch(`/api/listings?city=${city}&district=${district}&offerType=${offerType}&limit=20`);
         if (!response.ok) throw new Error('Failed to fetch');
 
         const data = await response.json();
@@ -59,7 +60,7 @@ export default function ListingsPanel({ city, district, onListingHover, onClose,
     };
 
     fetchListings();
-  }, [city, district]);
+  }, [city, district, offerType]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pl-PL').format(price);
@@ -102,7 +103,7 @@ export default function ListingsPanel({ city, district, onListingHover, onClose,
   const ignoredCount = listings.filter(l => ignoredListings?.has(l.id)).length;
 
   return (
-    <div className="tactical-panel rounded-lg overflow-hidden flex flex-col max-h-[500px]">
+    <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-3 border-b border-[#00d4aa15] flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">

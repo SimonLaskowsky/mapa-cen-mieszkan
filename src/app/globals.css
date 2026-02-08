@@ -130,7 +130,7 @@ button, a, [role="button"], input, select, textarea, label[for], .maplibregl-ctr
 
 /* MapLibre overrides */
 .maplibregl-popup {
-  z-index: 145;
+  z-index: 200;
 }
 .maplibregl-popup-content {
   background: rgba(10, 18, 24, 0.95) !important;
@@ -198,7 +198,7 @@ button, a, [role="button"], input, select, textarea, label[for], .maplibregl-ctr
 /* District markers on map */
 .district-marker {
   pointer-events: none;
-  z-index: 145;
+  z-index: 100;
 }
 
 .district-marker-content {
@@ -508,7 +508,7 @@ button, a, [role="button"], input, select, textarea, label[for], .maplibregl-ctr
 }
 
 .listing-marker:hover {
-  z-index: 1000 !important;
+  z-index: 50 !important;
 }
 
 /* ============================================

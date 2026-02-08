@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Legend from '@/components/Legend';
 import StatsPanel from '@/components/StatsPanel';
+import ListingsPanel from '@/components/ListingsPanel';
 import CitySelector from '@/components/CitySelector';
 import AddressSearch from '@/components/AddressSearch';
 import CountUp from '@/components/CountUp';
@@ -97,6 +98,14 @@ export default function Home() {
       localStorage.setItem('ignored-listings', JSON.stringify([...next]));
       return next;
     });
+    // Remove from favourites if ignoring
+    setFavouriteListings(prev => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      localStorage.setItem('favourite-listings', JSON.stringify([...next]));
+      return next;
+    });
   };
 
   const toggleFavourite = (id: string) => {
@@ -104,6 +113,14 @@ export default function Home() {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       localStorage.setItem('favourite-listings', JSON.stringify([...next]));
+      return next;
+    });
+    // Remove from ignored if favouriting
+    setIgnoredListings(prev => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      localStorage.setItem('ignored-listings', JSON.stringify([...next]));
       return next;
     });
   };
@@ -387,11 +404,6 @@ export default function Home() {
                 citySlug={CITY_API_SLUGS[currentCity] || currentCity}
                 selectedDistrict={focusedDistrict}
                 onDistrictSelect={onDistrictSelect}
-                onListingHover={setHoveredListing}
-                ignoredListings={ignoredListings}
-                favouriteListings={favouriteListings}
-                onIgnore={toggleIgnore}
-                onFavourite={toggleFavourite}
               />
             ) : (
               <div className="h-full flex items-center justify-center">
@@ -526,7 +538,7 @@ export default function Home() {
             ) : null}
 
             {/* Map Overlays */}
-            <div className="absolute top-3 left-3 flex items-center gap-2">
+            <div className="absolute top-3 left-3 z-[10] flex items-center gap-2">
               <div className="tactical-panel rounded px-3 py-1.5 flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
                 <span className="font-mono text-xs text-red-400">LIVE FEED</span>
@@ -534,7 +546,7 @@ export default function Home() {
             </div>
 
             {/* Address Search */}
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-72 z-[157]">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-72 z-[45]">
               <AddressSearch
                 cityName={cityConfig.name}
                 onLocationFound={setSearchLocation}
@@ -543,7 +555,7 @@ export default function Home() {
             </div>
 
             
-            <div className="absolute bottom-3 left-3 flex flex-col gap-2">
+            <div className="absolute bottom-3 left-3 z-[10] flex flex-col gap-2">
               <div className="tactical-panel rounded px-3 py-1.5">
                 <span className="font-mono text-xs text-gray-400">{cityStats.districtCount} DISTRICTS MONITORED</span>
               </div>
@@ -559,6 +571,29 @@ export default function Home() {
                   <span className="font-mono text-[10px] text-gray-500">BELOW</span>
                   <span className="font-mono text-[10px] text-gray-600">→</span>
                   <span className="font-mono text-[10px] text-gray-500">ABOVE AVG</span>
+                </div>
+              )}
+            </div>
+
+            {/* Listings Slide-Over Panel */}
+            <div
+              className={`absolute top-0 right-0 h-full w-80 z-[40] transition-transform duration-300 ease-in-out ${
+                focusedDistrict && cityData ? 'translate-x-0' : 'translate-x-full'
+              }`}
+            >
+              {focusedDistrict && cityData && (
+                <div className="h-full tactical-panel border-l border-[#00d4aa15]">
+                  <ListingsPanel
+                    city={CITY_API_SLUGS[currentCity] || currentCity}
+                    district={focusedDistrict}
+                    offerType={offerType}
+                    onListingHover={(listing) => setHoveredListing(listing ? { id: listing.id, lat: listing.lat, lng: listing.lng } : null)}
+                    onClose={() => setFocusedDistrict(null)}
+                    ignoredListings={ignoredListings}
+                    favouriteListings={favouriteListings}
+                    onIgnore={toggleIgnore}
+                    onFavourite={toggleFavourite}
+                  />
                 </div>
               )}
             </div>

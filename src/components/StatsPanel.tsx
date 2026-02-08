@@ -2,7 +2,6 @@
 
 import { formatPercent, type CityData } from '@/lib/city-data';
 import TrendChart from './TrendChart';
-import ListingsPanel from './ListingsPanel';
 import CountUp from './CountUp';
 import { useSoundEffects } from '@/lib/useSoundEffects';
 
@@ -14,25 +13,14 @@ function getYieldColor(yieldValue: number): string {
   return 'text-red-400';
 }
 
-interface HoveredListing {
-  id: string;
-  lat: number;
-  lng: number;
-}
-
 interface StatsPanelProps {
   cityData: CityData;
   citySlug: string;
   selectedDistrict: string | null;
   onDistrictSelect: (district: string | null) => void;
-  onListingHover?: (listing: HoveredListing | null) => void;
-  ignoredListings?: Set<string>;
-  favouriteListings?: Set<string>;
-  onIgnore?: (id: string) => void;
-  onFavourite?: (id: string) => void;
 }
 
-export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDistrictSelect, onListingHover, ignoredListings, favouriteListings, onIgnore, onFavourite }: StatsPanelProps) {
+export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDistrictSelect }: StatsPanelProps) {
   const { playSound } = useSoundEffects();
 
   const handleDistrictClick = (districtName: string) => {
@@ -99,23 +87,13 @@ export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDis
         })}
       </div>
 
-      {/* Trend Chart & Listings */}
+      {/* Trend Chart */}
       {selectedDistrict && (
-        <div className="pt-3 mt-3 border-t border-[#00d4aa15] space-y-3">
+        <div className="pt-3 mt-3 border-t border-[#00d4aa15]">
           <TrendChart
             city={citySlug}
             district={selectedDistrict}
             onClose={() => onDistrictSelect(null)}
-          />
-          <ListingsPanel
-            city={citySlug}
-            district={selectedDistrict}
-            onListingHover={(listing) => onListingHover?.(listing ? { id: listing.id, lat: listing.lat, lng: listing.lng } : null)}
-            onClose={() => onDistrictSelect(null)}
-            ignoredListings={ignoredListings}
-            favouriteListings={favouriteListings}
-            onIgnore={onIgnore}
-            onFavourite={onFavourite}
           />
         </div>
       )}
