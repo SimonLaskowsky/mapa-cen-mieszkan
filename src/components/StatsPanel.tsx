@@ -26,9 +26,13 @@ interface StatsPanelProps {
   selectedDistrict: string | null;
   onDistrictSelect: (district: string | null) => void;
   onListingHover?: (listing: HoveredListing | null) => void;
+  ignoredListings?: Set<string>;
+  favouriteListings?: Set<string>;
+  onIgnore?: (id: string) => void;
+  onFavourite?: (id: string) => void;
 }
 
-export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDistrictSelect, onListingHover }: StatsPanelProps) {
+export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDistrictSelect, onListingHover, ignoredListings, favouriteListings, onIgnore, onFavourite }: StatsPanelProps) {
   const { playSound } = useSoundEffects();
 
   const handleDistrictClick = (districtName: string) => {
@@ -108,6 +112,10 @@ export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDis
             district={selectedDistrict}
             onListingHover={(listing) => onListingHover?.(listing ? { id: listing.id, lat: listing.lat, lng: listing.lng } : null)}
             onClose={() => onDistrictSelect(null)}
+            ignoredListings={ignoredListings}
+            favouriteListings={favouriteListings}
+            onIgnore={onIgnore}
+            onFavourite={onFavourite}
           />
         </div>
       )}

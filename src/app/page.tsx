@@ -76,6 +76,38 @@ export default function Home() {
   const [layersOpen, setLayersOpen] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(true);
 
+  // Ignore & Favourite listings
+  const [ignoredListings, setIgnoredListings] = useState<Set<string>>(new Set());
+  const [favouriteListings, setFavouriteListings] = useState<Set<string>>(new Set());
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const ignored = localStorage.getItem('ignored-listings');
+      const favourites = localStorage.getItem('favourite-listings');
+      if (ignored) setIgnoredListings(new Set(JSON.parse(ignored)));
+      if (favourites) setFavouriteListings(new Set(JSON.parse(favourites)));
+    } catch {}
+  }, []);
+
+  const toggleIgnore = (id: string) => {
+    setIgnoredListings(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      localStorage.setItem('ignored-listings', JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const toggleFavourite = (id: string) => {
+    setFavouriteListings(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      localStorage.setItem('favourite-listings', JSON.stringify([...next]));
+      return next;
+    });
+  };
+
   // Memoize filters object to avoid unnecessary re-renders
   const listingFilters = useMemo(() => ({
     minPrice: minPrice ? parseInt(minPrice, 10) : undefined,
@@ -356,6 +388,10 @@ export default function Home() {
                 selectedDistrict={focusedDistrict}
                 onDistrictSelect={onDistrictSelect}
                 onListingHover={setHoveredListing}
+                ignoredListings={ignoredListings}
+                favouriteListings={favouriteListings}
+                onIgnore={toggleIgnore}
+                onFavourite={toggleFavourite}
               />
             ) : (
               <div className="h-full flex items-center justify-center">
@@ -484,6 +520,8 @@ export default function Home() {
                 showDistrictFill={showDistrictFill}
                 listingFilters={listingFilters}
                 hoveredListingId={hoveredListing?.id}
+                ignoredListings={ignoredListings}
+                favouriteListings={favouriteListings}
               />
             ) : null}
 

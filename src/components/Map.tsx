@@ -66,6 +66,8 @@ interface MapProps {
   showDistrictFill?: boolean;
   listingFilters?: ListingFilters;
   hoveredListingId?: string;
+  ignoredListings?: Set<string>;
+  favouriteListings?: Set<string>;
 }
 
 // Get price tier (1-6) for color coding based on offer type
@@ -137,7 +139,7 @@ function getPriceThreatLevel(price: number, offerType: 'sale' | 'rent' = 'sale')
   }
 }
 
-export default function Map({ cityId, cityData, offerType = 'sale', onCityChange, onDistrictSelect, searchLocation, focusedDistrict, onDistrictClick, showListings = true, showDistrictLabels = true, showHeatmap = true, showDistrictFill = true, listingFilters, hoveredListingId }: MapProps) {
+export default function Map({ cityId, cityData, offerType = 'sale', onCityChange, onDistrictSelect, searchLocation, focusedDistrict, onDistrictClick, showListings = true, showDistrictLabels = true, showHeatmap = true, showDistrictFill = true, listingFilters, hoveredListingId, ignoredListings, favouriteListings }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popup = useRef<maplibregl.Popup | null>(null);
@@ -154,6 +156,8 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
   const [listings, setListings] = useState<Listing[]>([]);
   const { playSound } = useSoundEffects();
   const playSoundRef = useRef(playSound);
+  const ignoredListingsRef = useRef(ignoredListings);
+  const favouriteListingsRef = useRef(favouriteListings);
 
   // Get current city config
   const cityConfig = CITIES[cityId];
@@ -162,6 +166,14 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
   useEffect(() => {
     cityDataRef.current = cityData;
   }, [cityData]);
+
+  useEffect(() => {
+    ignoredListingsRef.current = ignoredListings;
+  }, [ignoredListings]);
+
+  useEffect(() => {
+    favouriteListingsRef.current = favouriteListings;
+  }, [favouriteListings]);
 
   useEffect(() => {
     onDistrictClickRef.current = onDistrictClick;
@@ -331,6 +343,22 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
 
       // Store element reference by listing ID for hover highlighting
       listingMarkerElementsRef.current[listing.id] = el;
+
+      // Apply ignore/favourite styles at creation time
+      const isIgnored = ignoredListingsRef.current?.has(listing.id);
+      const isFavourite = favouriteListingsRef.current?.has(listing.id);
+      if (isIgnored) {
+        el.style.filter = 'grayscale(1)';
+        const pulse = el.querySelector('.listing-marker-pulse') as HTMLElement;
+        if (pulse) pulse.style.display = 'none';
+      } else if (isFavourite) {
+        const dot = el.querySelector('.listing-marker-dot') as HTMLElement;
+        if (dot) {
+          dot.style.border = '2px solid #eab308';
+          dot.style.boxShadow = '0 0 12px rgba(234,179,8,0.7)';
+          dot.style.transform = 'rotate(45deg) scale(1.2)';
+        }
+      }
 
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([listing.lng + offsetLng, listing.lat + offsetLat])
@@ -979,12 +1007,52 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
     }
   }, [showDistrictFill]);
 
+  // Apply ignore/favourite visual styles to listing markers
+  useEffect(() => {
+    Object.entries(listingMarkerElementsRef.current).forEach(([id, el]) => {
+      const dot = el.querySelector('.listing-marker-dot') as HTMLElement;
+      const pulse = el.querySelector('.listing-marker-pulse') as HTMLElement;
+      if (!dot) return;
+
+      const isIgnored = ignoredListings?.has(id);
+      const isFavourite = favouriteListings?.has(id);
+
+      if (isIgnored) {
+        el.style.filter = 'grayscale(1)';
+        if (pulse) pulse.style.display = 'none';
+      } else if (isFavourite) {
+        el.style.filter = 'none';
+        dot.style.border = '2px solid #eab308';
+        dot.style.boxShadow = '0 0 12px rgba(234,179,8,0.7)';
+        dot.style.transform = 'rotate(45deg) scale(1.2)';
+        if (pulse) pulse.style.display = 'block';
+      } else {
+        el.style.filter = 'none';
+        dot.style.border = '2px solid #05080a';
+        dot.style.boxShadow = '0 0 8px rgba(0,212,170,0.6)';
+        dot.style.transform = 'rotate(45deg) scale(1)';
+        if (pulse) pulse.style.display = 'block';
+      }
+    });
+  }, [ignoredListings, favouriteListings]);
+
   // Highlight listing marker on hover from panel
   useEffect(() => {
-    // Reset all markers to normal state
-    Object.values(listingMarkerElementsRef.current).forEach((el) => {
+    // Reset all markers to normal state (respecting ignore/fav)
+    Object.entries(listingMarkerElementsRef.current).forEach(([id, el]) => {
       const dot = el.querySelector('.listing-marker-dot') as HTMLElement;
-      if (dot) {
+      if (!dot) return;
+
+      const isIgnored = ignoredListings?.has(id);
+      const isFavourite = favouriteListings?.has(id);
+
+      if (isIgnored) {
+        dot.style.transform = 'rotate(45deg) scale(1)';
+        dot.style.boxShadow = '0 0 8px rgba(0,212,170,0.6)';
+      } else if (isFavourite) {
+        dot.style.transform = 'rotate(45deg) scale(1.2)';
+        dot.style.boxShadow = '0 0 12px rgba(234,179,8,0.7)';
+      } else {
         dot.style.transform = 'rotate(45deg) scale(1)';
         dot.style.boxShadow = '0 0 8px rgba(0,212,170,0.6)';
       }
@@ -1001,7 +1069,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
       }
       el.style.zIndex = '1000';
     }
-  }, [hoveredListingId]);
+  }, [hoveredListingId, ignoredListings, favouriteListings]);
 
   return (
     <div ref={mapContainer} className="map-container map-crosshair w-full h-full" />
