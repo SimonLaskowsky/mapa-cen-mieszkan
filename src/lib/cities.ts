@@ -17,7 +17,7 @@ export const CITIES: Record<string, CityConfig> = {
     nameShort: 'WAW',
     center: [21.0, 52.23],
     zoom: 10.8,
-    bounds: [[20.76, 52.09], [21.27, 52.37]],
+    bounds: [[20.76, 52.09], [21.28, 52.38]],
     districtPropertyName: 'name',
   },
   krakow: {
@@ -26,7 +26,7 @@ export const CITIES: Record<string, CityConfig> = {
     nameShort: 'KRK',
     center: [19.945, 50.06],
     zoom: 11.5,
-    bounds: [[19.79, 49.97], [20.22, 50.13]],
+    bounds: [[19.78, 49.96], [20.23, 50.14]],
     districtPropertyName: 'name', // Will be processed to extract clean name
   },
   wroclaw: {
@@ -35,7 +35,7 @@ export const CITIES: Record<string, CityConfig> = {
     nameShort: 'WRO',
     center: [17.03, 51.11],
     zoom: 11.5,
-    bounds: [[16.87, 51.03], [17.18, 51.21]],
+    bounds: [[16.80, 51.03], [17.19, 51.22]],
     districtPropertyName: 'osiedle',
   },
   katowice: {
@@ -44,7 +44,7 @@ export const CITIES: Record<string, CityConfig> = {
     nameShort: 'KTW',
     center: [19.02, 50.26],
     zoom: 11.5,
-    bounds: [[18.9, 50.15], [19.15, 50.35]],
+    bounds: [[18.88, 50.12], [19.15, 50.35]],
     districtPropertyName: 'name',
   },
   gdansk: {
@@ -53,7 +53,7 @@ export const CITIES: Record<string, CityConfig> = {
     nameShort: 'GDA',
     center: [18.65, 54.35],
     zoom: 11.5,
-    bounds: [[18.45, 54.28], [18.85, 54.45]],
+    bounds: [[18.42, 54.26], [18.96, 54.46]],
     districtPropertyName: 'name',
   },
   poznan: {
@@ -62,7 +62,7 @@ export const CITIES: Record<string, CityConfig> = {
     nameShort: 'POZ',
     center: [16.93, 52.41],
     zoom: 11.5,
-    bounds: [[16.73, 52.30], [17.13, 52.52]],
+    bounds: [[16.72, 52.28], [17.13, 52.52]],
     districtPropertyName: 'name',
   },
   lodz: {

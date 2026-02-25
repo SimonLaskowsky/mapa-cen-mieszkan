@@ -141,6 +141,15 @@ async function seedDistricts() {
     }
   }
 
+  // Refresh PostGIS geometries from JSONB
+  console.log('\n🗺️  Refreshing PostGIS geometries...');
+  const { error: rpcError } = await supabase.rpc('refresh_district_geometries');
+  if (rpcError) {
+    console.error('   ⚠️  Error refreshing geometries (PostGIS may not be enabled yet):', rpcError.message);
+  } else {
+    console.log('   ✅ Geometries refreshed');
+  }
+
   console.log(`\n✨ Done! Total districts: ${totalInserted}`);
 }
 

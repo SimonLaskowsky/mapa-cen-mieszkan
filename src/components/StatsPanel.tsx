@@ -5,14 +5,6 @@ import TrendChart from './TrendChart';
 import CountUp from './CountUp';
 import { useSoundEffects } from '@/lib/useSoundEffects';
 
-function getYieldColor(yieldValue: number): string {
-  if (yieldValue >= 7) return 'text-green-400';
-  if (yieldValue >= 5) return 'text-lime-400';
-  if (yieldValue >= 4) return 'text-yellow-400';
-  if (yieldValue >= 3) return 'text-orange-400';
-  return 'text-red-400';
-}
-
 interface StatsPanelProps {
   cityData: CityData;
   citySlug: string;
@@ -40,7 +32,6 @@ export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDis
         <span className="font-mono text-[10px] text-gray-600 w-6">#</span>
         <span className="font-mono text-[10px] text-gray-600 flex-1">DISTRICT</span>
         <span className="font-mono text-[10px] text-gray-600 w-16 text-right">PRICE</span>
-        <span className="font-mono text-[10px] text-gray-600 w-12 text-right">YIELD</span>
         <span className="font-mono text-[10px] text-gray-600 w-12 text-right">Δ30D</span>
       </div>
 
@@ -75,9 +66,6 @@ export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDis
               </div>
               <span className="font-mono text-xs text-white w-16 text-right">
                 {(district.avgPriceM2 / 1000).toFixed(1)}K
-              </span>
-              <span className={`font-mono text-xs w-12 text-right ${district.rentalYield ? getYieldColor(district.rentalYield) : 'text-gray-600'}`}>
-                {district.rentalYield ? `${district.rentalYield.toFixed(1)}%` : '—'}
               </span>
               <span className={`font-mono text-xs w-12 text-right ${changeColor}`}>
                 {formatPercent(district.change30d)}

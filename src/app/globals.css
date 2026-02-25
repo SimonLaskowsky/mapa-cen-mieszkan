@@ -18,12 +18,31 @@ body {
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
   min-height: 100vh;
   overflow: hidden;
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cline x1='12' y1='0' x2='12' y2='9' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='12' y1='15' x2='12' y2='24' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='0' y1='12' x2='9' y2='12' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='15' y1='12' x2='24' y2='12' stroke='%2300d4aa' stroke-width='1'/%3E%3Ccircle cx='12' cy='12' r='4' fill='none' stroke='%2300d4aa' stroke-width='0.75' opacity='0.5'/%3E%3C/svg%3E") 12 12, crosshair;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cline x1='0' y1='32' x2='24' y2='32' stroke='%2300d4aa' stroke-width='0.75' opacity='0.45' stroke-dasharray='4,3'/%3E%3Cline x1='40' y1='32' x2='64' y2='32' stroke='%2300d4aa' stroke-width='0.75' opacity='0.45' stroke-dasharray='4,3'/%3E%3Cline x1='32' y1='0' x2='32' y2='24' stroke='%2300d4aa' stroke-width='0.75' opacity='0.45' stroke-dasharray='4,3'/%3E%3Cline x1='32' y1='40' x2='32' y2='64' stroke='%2300d4aa' stroke-width='0.75' opacity='0.45' stroke-dasharray='4,3'/%3E%3Ccircle cx='32' cy='32' r='8' stroke='%2300d4aa' fill='none' stroke-width='0.5' opacity='0.25'/%3E%3Cline x1='22' y1='22' x2='22' y2='27' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='22' y1='22' x2='27' y2='22' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='42' y1='22' x2='42' y2='27' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='42' y1='22' x2='37' y2='22' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='22' y1='42' x2='22' y2='37' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='22' y1='42' x2='27' y2='42' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='42' y1='42' x2='42' y2='37' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='42' y1='42' x2='37' y2='42' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Crect x='31' y='31' width='2' height='2' fill='%2300d4aa' opacity='0.9' transform='rotate(45,32,32)'/%3E%3C/svg%3E") 32 32, crosshair;
 }
 
-/* Interactive elements keep pointer cursor */
-button, a, [role="button"], input, select, textarea, label[for], .maplibregl-ctrl button {
-  cursor: pointer !important;
+/* Interactive elements get the same crosshair + a glow pulse on hover */
+button, a, [role="button"], input, select, textarea, label[for],
+.maplibregl-ctrl button, [onclick], [class*="cursor-pointer"] {
+  cursor: inherit !important;
+  position: relative;
+}
+
+button::after, a::after, [role="button"]::after,
+[onclick]::after, [class*="cursor-pointer"]::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  pointer-events: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+button:hover::after, a:hover::after, [role="button"]:hover::after,
+[onclick]:hover::after, [class*="cursor-pointer"]:hover::after {
+  border-color: rgba(0, 212, 170, 0.25);
+  box-shadow: 0 0 8px rgba(0, 212, 170, 0.15), inset 0 0 8px rgba(0, 212, 170, 0.05);
 }
 
 /* Grid background */
@@ -199,6 +218,7 @@ button, a, [role="button"], input, select, textarea, label[for], .maplibregl-ctr
 .district-marker {
   pointer-events: none;
   z-index: 100;
+  max-width: 150px;
 }
 
 .district-marker-content {
@@ -244,6 +264,7 @@ button, a, [role="button"], input, select, textarea, label[for], .maplibregl-ctr
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 2px;
+  line-height: 15px;
 }
 
 .marker-bars {
@@ -513,14 +534,17 @@ button, a, [role="button"], input, select, textarea, label[for], .maplibregl-ctr
 
 /* ============================================
    CROSSHAIR CURSOR FOR MAP
+   Hacking/tracing reticle: dashed scan lines,
+   corner lock brackets, targeting circle, center diamond
    ============================================ */
-.map-crosshair {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cline x1='12' y1='0' x2='12' y2='9' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='12' y1='15' x2='12' y2='24' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='0' y1='12' x2='9' y2='12' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='15' y1='12' x2='24' y2='12' stroke='%2300d4aa' stroke-width='1'/%3E%3Ccircle cx='12' cy='12' r='4' fill='none' stroke='%2300d4aa' stroke-width='0.75' opacity='0.5'/%3E%3C/svg%3E") 12 12, crosshair !important;
+.map-crosshair,
+body {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cline x1='0' y1='32' x2='24' y2='32' stroke='%2300d4aa' stroke-width='0.75' opacity='0.45' stroke-dasharray='4,3'/%3E%3Cline x1='40' y1='32' x2='64' y2='32' stroke='%2300d4aa' stroke-width='0.75' opacity='0.45' stroke-dasharray='4,3'/%3E%3Cline x1='32' y1='0' x2='32' y2='24' stroke='%2300d4aa' stroke-width='0.75' opacity='0.45' stroke-dasharray='4,3'/%3E%3Cline x1='32' y1='40' x2='32' y2='64' stroke='%2300d4aa' stroke-width='0.75' opacity='0.45' stroke-dasharray='4,3'/%3E%3Ccircle cx='32' cy='32' r='8' stroke='%2300d4aa' fill='none' stroke-width='0.5' opacity='0.25'/%3E%3Cline x1='22' y1='22' x2='22' y2='27' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='22' y1='22' x2='27' y2='22' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='42' y1='22' x2='42' y2='27' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='42' y1='22' x2='37' y2='22' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='22' y1='42' x2='22' y2='37' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='22' y1='42' x2='27' y2='42' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='42' y1='42' x2='42' y2='37' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='42' y1='42' x2='37' y2='42' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Crect x='31' y='31' width='2' height='2' fill='%2300d4aa' opacity='0.9' transform='rotate(45,32,32)'/%3E%3C/svg%3E") 32 32, crosshair !important;
 }
 
 .map-crosshair *,
 .maplibregl-canvas {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cline x1='12' y1='0' x2='12' y2='9' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='12' y1='15' x2='12' y2='24' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='0' y1='12' x2='9' y2='12' stroke='%2300d4aa' stroke-width='1'/%3E%3Cline x1='15' y1='12' x2='24' y2='12' stroke='%2300d4aa' stroke-width='1'/%3E%3Ccircle cx='12' cy='12' r='4' fill='none' stroke='%2300d4aa' stroke-width='0.75' opacity='0.5'/%3E%3C/svg%3E") 12 12, crosshair !important;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cline x1='0' y1='32' x2='24' y2='32' stroke='%2300d4aa' stroke-width='0.75' opacity='0.45' stroke-dasharray='4,3'/%3E%3Cline x1='40' y1='32' x2='64' y2='32' stroke='%2300d4aa' stroke-width='0.75' opacity='0.45' stroke-dasharray='4,3'/%3E%3Cline x1='32' y1='0' x2='32' y2='24' stroke='%2300d4aa' stroke-width='0.75' opacity='0.45' stroke-dasharray='4,3'/%3E%3Cline x1='32' y1='40' x2='32' y2='64' stroke='%2300d4aa' stroke-width='0.75' opacity='0.45' stroke-dasharray='4,3'/%3E%3Ccircle cx='32' cy='32' r='8' stroke='%2300d4aa' fill='none' stroke-width='0.5' opacity='0.25'/%3E%3Cline x1='22' y1='22' x2='22' y2='27' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='22' y1='22' x2='27' y2='22' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='42' y1='22' x2='42' y2='27' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='42' y1='22' x2='37' y2='22' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='22' y1='42' x2='22' y2='37' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='22' y1='42' x2='27' y2='42' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='42' y1='42' x2='42' y2='37' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Cline x1='42' y1='42' x2='37' y2='42' stroke='%2300d4aa' stroke-width='1' opacity='0.7'/%3E%3Crect x='31' y='31' width='2' height='2' fill='%2300d4aa' opacity='0.9' transform='rotate(45,32,32)'/%3E%3C/svg%3E") 32 32, crosshair !important;
 }
 
 /* Custom animated crosshair overlay */
@@ -588,6 +612,159 @@ button, a, [role="button"], input, select, textarea, label[for], .maplibregl-ctr
   height: 20px;
   background: var(--background);
   transform: translate(-50%, -50%);
+}
+
+/* ============================================
+   CLICK LOCK-ON EFFECT
+   ============================================ */
+.click-effect {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+}
+
+/* Expanding rings */
+.click-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border: 1px solid #00d4aa;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.click-ring-1 {
+  animation: clickRing 0.5s ease-out forwards;
+}
+
+.click-ring-2 {
+  animation: clickRing 0.7s ease-out 0.05s forwards;
+  border-style: dashed;
+}
+
+@keyframes clickRing {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 0.8;
+  }
+  100% {
+    width: 60px;
+    height: 60px;
+    opacity: 0;
+  }
+}
+
+/* Rotating diamond at center */
+.click-diamond {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  background: #00d4aa;
+  transform: translate(-50%, -50%) rotate(45deg);
+  animation: clickDiamond 0.4s ease-out forwards;
+}
+
+@keyframes clickDiamond {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(45deg) scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translate(-50%, -50%) rotate(225deg) scale(1.5);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(405deg) scale(0.5);
+  }
+}
+
+/* Corner brackets that fly outward */
+.click-bracket {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-color: #00d4aa;
+  border-style: solid;
+  border-width: 0;
+}
+
+.click-bracket-tl {
+  border-top-width: 1.5px;
+  border-left-width: 1.5px;
+  animation: bracketTL 0.4s ease-out forwards;
+}
+.click-bracket-tr {
+  border-top-width: 1.5px;
+  border-right-width: 1.5px;
+  animation: bracketTR 0.4s ease-out forwards;
+}
+.click-bracket-bl {
+  border-bottom-width: 1.5px;
+  border-left-width: 1.5px;
+  animation: bracketBL 0.4s ease-out forwards;
+}
+.click-bracket-br {
+  border-bottom-width: 1.5px;
+  border-right-width: 1.5px;
+  animation: bracketBR 0.4s ease-out forwards;
+}
+
+@keyframes bracketTL {
+  0% { top: -4px; left: -4px; opacity: 0.9; }
+  100% { top: -22px; left: -22px; opacity: 0; }
+}
+@keyframes bracketTR {
+  0% { top: -4px; right: -4px; opacity: 0.9; }
+  100% { top: -22px; right: -22px; opacity: 0; }
+}
+@keyframes bracketBL {
+  0% { bottom: -4px; left: -4px; opacity: 0.9; }
+  100% { bottom: -22px; left: -22px; opacity: 0; }
+}
+@keyframes bracketBR {
+  0% { bottom: -4px; right: -4px; opacity: 0.9; }
+  100% { bottom: -22px; right: -22px; opacity: 0; }
+}
+
+/* Scan lines that flash outward */
+.click-scanline {
+  position: absolute;
+  background: #00d4aa;
+}
+
+.click-scanline-h {
+  top: 50%;
+  left: 50%;
+  height: 1px;
+  width: 0;
+  transform: translateY(-50%);
+  animation: scanlineH 0.3s ease-out forwards;
+}
+
+.click-scanline-v {
+  left: 50%;
+  top: 50%;
+  width: 1px;
+  height: 0;
+  transform: translateX(-50%);
+  animation: scanlineV 0.3s ease-out forwards;
+}
+
+@keyframes scanlineH {
+  0% { width: 0; margin-left: 0; opacity: 0.7; }
+  100% { width: 80px; margin-left: -40px; opacity: 0; }
+}
+
+@keyframes scanlineV {
+  0% { height: 0; margin-top: 0; opacity: 0.7; }
+  100% { height: 80px; margin-top: -40px; opacity: 0; }
 }
 
 /* ============================================

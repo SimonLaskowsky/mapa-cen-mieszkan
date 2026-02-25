@@ -38,7 +38,7 @@ async function main() {
     return {
       city: 'katowice',
       district: normalizedName,
-      geojson: feature.geometry,
+      geojson: feature,
       center_lat: feature.properties.center_lat,
       center_lng: feature.properties.center_lng,
     };
