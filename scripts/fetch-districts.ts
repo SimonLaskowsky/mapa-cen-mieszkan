@@ -46,6 +46,11 @@ const CITY_CONFIGS: Record<string, { osmRelationId: number; adminLevel: number; 
     adminLevel: 9,            // 5 large dzielnice
     outputFile: 'lodz-districts.json',
   },
+  wroclaw: {
+    osmRelationId: 2_805_690, // Wrocław city (admin_level=8)
+    adminLevel: 9,            // osiedla — falls back to 10 if none found
+    outputFile: 'wroclaw-districts.json',
+  },
 };
 
 async function fetchOverpass(query: string): Promise<OverpassResponse> {

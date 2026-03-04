@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import ClickEffect from '@/components/ClickEffect';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -16,7 +15,6 @@ export default function RootLayout({
   return (
     <html lang="pl">
       <body className="antialiased">
-        <ClickEffect />
         {children}
       </body>
     </html>

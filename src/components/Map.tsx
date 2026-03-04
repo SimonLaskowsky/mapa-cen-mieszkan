@@ -116,6 +116,30 @@ function getPriceBars(tier: number): string {
   return '█'.repeat(filled) + '░'.repeat(empty);
 }
 
+function buildRcnSection(stats: DistrictStats, offerType: string): string {
+  if (offerType !== 'sale' || !stats.rcnMedianPriceM2) return '';
+  const offerDiff = (stats.medianPriceM2 - stats.rcnMedianPriceM2) / stats.rcnMedianPriceM2 * 100;
+  const diffColor = offerDiff > 0 ? '#f97316' : '#22c55e';
+  const sign = offerDiff > 0 ? '+' : '';
+  const monthStr = stats.rcnMonth ? stats.rcnMonth.slice(0, 7) : '';
+  return `<div style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 8px; padding-top: 8px; display: grid; gap: 6px;">
+              <div style="font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.08em;">TRANSACTION PRICES (RCN)</div>
+              <div style="display: flex; justify-content: space-between; gap: 4px;">
+                <span style="color: rgba(255,255,255,0.5);">MEDIAN TRANSACTED/M²</span>
+                <span style="color: #a78bfa; font-weight: 600;">${formatPrice(stats.rcnMedianPriceM2)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; gap: 4px;">
+                <span style="color: rgba(255,255,255,0.5);">OFFER vs ACTUAL</span>
+                <span style="color: ${diffColor};">${sign}${offerDiff.toFixed(1)}% ${offerDiff > 0 ? 'above' : 'below'}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; gap: 4px;">
+                <span style="color: rgba(255,255,255,0.5);">TRANSACTIONS</span>
+                <span style="color: white;">${stats.rcnTransactionCount ?? '—'}</span>
+              </div>
+              ${monthStr ? `<div style="color: rgba(255,255,255,0.25); font-size: 10px; text-align: right;">data: ${monthStr}</div>` : ''}
+            </div>`;
+}
+
 function getPriceThreatLevel(price: number, offerType: 'sale' | 'rent' = 'sale'): { label: string; color: string } {
   if (offerType === 'rent') {
     if (price < 2500) return { label: 'LOW', color: '#22c55e' };
@@ -244,7 +268,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
       el.style.cssText = `
         width: 0;
         height: 0;
-        cursor: inherit;
+        cursor: pointer;
         z-index: ${index + 1};
       `;
       el.innerHTML = `
@@ -393,7 +417,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
         <div class="district-marker-content" style="--tier-color: ${color};">
           <div class="marker-name">${displayName}</div>
           <div class="marker-bars" style="color: ${color};">${bars}</div>
-          <div class="marker-price">${(displayPrice / 1000).toFixed(1)}k</div>
+          <div class="marker-price" style="color: ${color};">${(displayPrice / 1000).toFixed(1)}k</div>
           ${rangeHtml}
           <div class="marker-meta">
             <span class="marker-listings">${stats.listingCount}</span>
@@ -403,7 +427,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
       `;
 
       const zoom = mapInstance.getZoom();
-      el.style.display = (showDistrictLabelsRef.current && zoom >= 10.5) ? 'block' : 'none';
+      el.style.display = (showDistrictLabelsRef.current && zoom >= 11.5) ? 'block' : 'none';
 
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([district.lng, district.lat])
@@ -455,6 +479,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
       container: mapContainer.current,
       style: {
         version: 8,
+        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
         sources: {
           'carto-dark': {
             type: 'raster',
@@ -510,7 +535,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
     map.current.on('moveend', fireBounds);
 
     // Hide district markers when zoomed out too far
-    const DISTRICT_LABEL_MIN_ZOOM = 10.5;
+    const DISTRICT_LABEL_MIN_ZOOM = 11.5;
     const updateMarkerVisibility = () => {
       if (!map.current) return;
       const zoom = map.current.getZoom();
@@ -645,7 +670,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
         data: geoJSONWithPrices as GeoJSON.FeatureCollection,
       });
 
-      // District fill - no fill for districts without data
+      // District fill - subtle tint for districts without data
       map.current.addLayer({
         id: 'district-fill',
         type: 'fill',
@@ -655,7 +680,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
           'fill-opacity': showDistrictFill ? [
             'case',
             ['!', ['get', 'hasData']],
-            0,
+            0.06,
             ['boolean', ['feature-state', 'hover'], false],
             0.35,
             0.15
@@ -673,7 +698,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
           'line-width': [
             'case',
             ['!', ['get', 'hasData']],
-            0.5,
+            0.8,
             ['boolean', ['feature-state', 'hover'], false],
             2.5,
             1
@@ -681,7 +706,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
           'line-opacity': [
             'case',
             ['!', ['get', 'hasData']],
-            0.3,
+            0.5,
             ['boolean', ['feature-state', 'hover'], false],
             1,
             0.6
@@ -766,7 +791,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
 
         const html = `
           <div style="font-family: ui-monospace, monospace;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid ${tierColor}40;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
               <span style="font-size: 14px; font-weight: 600; color: white;">${displayName.toUpperCase()}</span>
               <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${tierColor}20; color: ${tierColor}; border: 1px solid ${tierColor}40;">${threatLevel.label}</span>
             </div>
@@ -795,6 +820,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
                 <span style="color: rgba(255,255,255,0.5);">GROSS YIELD</span>
                 <span style="color: ${stats.rentalYield >= 5 ? '#22c55e' : stats.rentalYield >= 4 ? '#eab308' : '#ef4444'}; font-weight: 600;">${stats.rentalYield.toFixed(1)}%</span>
               </div>` : ''}
+              ${buildRcnSection(stats, currentOfferType)}
             </div>
           </div>
         `;
@@ -907,7 +933,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
 
     const html = `
       <div style="font-family: ui-monospace, monospace;">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid ${tierColor}40;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
           <span style="font-size: 14px; font-weight: 600; color: white;">${displayName.toUpperCase()}</span>
           <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${tierColor}20; color: ${tierColor}; border: 1px solid ${tierColor}40;">${threatLevel.label}</span>
         </div>
@@ -936,6 +962,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
             <span style="color: rgba(255,255,255,0.5);">GROSS YIELD</span>
             <span style="color: ${stats.rentalYield >= 5 ? '#22c55e' : stats.rentalYield >= 4 ? '#eab308' : '#ef4444'}; font-weight: 600;">${stats.rentalYield.toFixed(1)}%</span>
           </div>` : ''}
+          ${buildRcnSection(stats, currentOfferType)}
         </div>
       </div>
     `;
@@ -1076,7 +1103,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
   // Toggle district labels visibility (respects zoom)
   useEffect(() => {
     const zoom = map.current?.getZoom() ?? 11;
-    const visible = showDistrictLabels && zoom >= 10.5;
+    const visible = showDistrictLabels && zoom >= 11.5;
     markersRef.current.forEach(marker => {
       marker.getElement().style.display = visible ? 'block' : 'none';
     });

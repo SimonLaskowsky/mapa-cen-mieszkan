@@ -23,7 +23,8 @@ function PixelFade({ side }: { side: 'left' | 'right' }) {
         const prob = 1 - dist;
         const rand = seededRandom(col * 31 + row * 17 + (side === 'left' ? 0 : 997));
         if (rand < prob) {
-          const opacity = prob > 0.7 ? 1 : 0.7 + rand * 0.3;
+          // Round to 2 dp to avoid SSR/hydration precision mismatch (React 19)
+          const opacity = Math.round((prob > 0.7 ? 1 : 0.7 + rand * 0.3) * 100) / 100;
           cells.push({ col, row, opacity });
         }
       }
@@ -48,7 +49,7 @@ function PixelFade({ side }: { side: 'left' | 'right' }) {
             top: row * PX,
             width: PX,
             height: PX,
-            background: BG,
+            backgroundColor: BG,
             opacity,
           }}
         />
@@ -119,7 +120,7 @@ export default function CitySelector({ currentCity, onCityChange }: CitySelector
       lastTime = time;
 
       if (!hoveredRef.current && !draggingRef.current && !pausedRef.current) {
-        offsetRef.current -= 0.6 * (delta / 16);
+        offsetRef.current -= 0.25 * (delta / 16);
         wrapOffset();
         applyOffset();
       }
@@ -171,7 +172,7 @@ export default function CitySelector({ currentCity, onCityChange }: CitySelector
       <div
         ref={containerRef}
         className="overflow-hidden select-none"
-        style={{ cursor: 'inherit' }}
+        style={{ cursor: 'grab' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

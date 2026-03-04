@@ -1,0 +1,55 @@
+name: Monthly RCN Transaction Prices
+
+on:
+  schedule:
+    # 5th of each month at 3:00 AM UTC (after daily scrape catches up)
+    - cron: '0 3 5 * *'
+  workflow_dispatch:
+
+jobs:
+  rcn-fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install scraper dependencies
+        run: |
+          cd scraper
+          pnpm install
+
+      - name: Create .env.local for scraper
+        run: |
+          cat > .env.local << EOF
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+          EOF
+
+      - name: Fetch RCN transaction prices
+        run: |
+          cd scraper
+          pnpm rcn:fetch
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## RCN Fetch Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Date**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cities**: Krakow, Wroclaw, Gdansk, Poznan, Lodz" >> $GITHUB_STEP_SUMMARY

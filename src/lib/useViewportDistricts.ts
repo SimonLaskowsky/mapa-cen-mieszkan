@@ -18,6 +18,11 @@ interface ApiDistrictStats {
   change30d: number;
   avgSize: number;
   rentalYield?: number;
+  rcnMedianPriceM2?: number;
+  rcnTransactionCount?: number;
+  rcnCountPrimary?: number;
+  rcnCountSecondary?: number;
+  rcnMonth?: string;
 }
 
 interface ApiDistrictCenter {
@@ -73,7 +78,7 @@ export function useViewportDistricts(
 
     // Abort previous request
     if (abortController.current) {
-      abortController.current.abort();
+      abortController.current.abort('cancelled');
     }
     abortController.current = new AbortController();
 
@@ -107,6 +112,11 @@ export function useViewportDistricts(
           change30d: s.change30d,
           avgSize: s.avgSize,
           rentalYield: s.rentalYield,
+          rcnMedianPriceM2: s.rcnMedianPriceM2,
+          rcnTransactionCount: s.rcnTransactionCount,
+          rcnCountPrimary: s.rcnCountPrimary,
+          rcnCountSecondary: s.rcnCountSecondary,
+          rcnMonth: s.rcnMonth,
         };
       });
 
@@ -132,6 +142,8 @@ export function useViewportDistricts(
       setUpdatedAt(apiData.updatedAt);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
+      if ((err as { name?: string })?.name === 'AbortError') return;
+      if (err === 'cancelled') return;
       console.error('Error fetching viewport districts:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
@@ -157,7 +169,7 @@ export function useViewportDistricts(
   useEffect(() => {
     return () => {
       if (abortController.current) {
-        abortController.current.abort();
+        abortController.current.abort('cancelled');
       }
       clearTimeout(debounceTimer.current);
     };

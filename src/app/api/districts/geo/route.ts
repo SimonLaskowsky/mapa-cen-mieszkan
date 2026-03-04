@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
     // Fetch stats and changes for all cities in bbox (both offer types for yield)
     const otherType = offerType === 'sale' ? 'rent' : 'sale';
 
-    const [statsRes, changesRes, otherStatsRes] = await Promise.all([
+    const [statsRes, changesRes, otherStatsRes, rcnRes] = await Promise.all([
       supabase
         .from('latest_district_stats')
         .select('*')
@@ -124,6 +124,10 @@ export async function GET(request: NextRequest) {
         .in('city', cities)
         .eq('offer_type', otherType)
         .returns<LatestDistrictStats[]>(),
+      supabase
+        .from('latest_rcn_district_stats')
+        .select('city, district, median_price_m2, avg_price_m2, transaction_count, count_primary, count_secondary, month')
+        .in('city', cities),
     ]);
 
     // Index stats and changes by city+district
@@ -142,6 +146,17 @@ export async function GET(request: NextRequest) {
       otherStatsMap.set(`${s.city}:${s.district}`, s);
     });
 
+    const rcnMap = new Map<string, { median_price_m2: number; transaction_count: number; count_primary: number; count_secondary: number; month: string }>();
+    ((rcnRes.data as Array<{ city: string; district: string; median_price_m2: number; avg_price_m2: number; transaction_count: number; count_primary: number; count_secondary: number; month: string }>) || []).forEach(r => {
+      rcnMap.set(`${r.city}:${r.district}`, {
+        median_price_m2: r.median_price_m2,
+        transaction_count: r.transaction_count,
+        count_primary: r.count_primary,
+        count_secondary: r.count_secondary,
+        month: r.month,
+      });
+    });
+
     // Build GeoJSON FeatureCollection + stats
     const districtStats: Record<string, {
       district: string;
@@ -156,6 +171,11 @@ export async function GET(request: NextRequest) {
       change30d: number;
       avgSize: number;
       rentalYield?: number;
+      rcnMedianPriceM2?: number;
+      rcnTransactionCount?: number;
+      rcnCountPrimary?: number;
+      rcnCountSecondary?: number;
+      rcnMonth?: string;
     }> = {};
 
     const districtCenters: Array<{
@@ -199,6 +219,16 @@ export async function GET(request: NextRequest) {
             const rentPerM2 = rentAvgPrice / rentAvgSize;
             entry.rentalYield = (rentPerM2 * 12) / salePriceM2 * 100;
           }
+        }
+
+        // Merge RCN transaction prices (only for cities covered by WFS)
+        const rcn = rcnMap.get(key);
+        if (rcn?.median_price_m2) {
+          entry.rcnMedianPriceM2 = rcn.median_price_m2;
+          entry.rcnTransactionCount = rcn.transaction_count;
+          entry.rcnCountPrimary = rcn.count_primary;
+          entry.rcnCountSecondary = rcn.count_secondary;
+          entry.rcnMonth = rcn.month;
         }
 
         districtStats[d.district] = entry;

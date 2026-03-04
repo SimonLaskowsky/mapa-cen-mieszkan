@@ -12,6 +12,12 @@ export interface DistrictStats {
   change30d: number;
   avgSize: number;
   rentalYield?: number;
+  // RCN (Rejestr Cen Nieruchomości) — actual transaction prices from geoportal.gov.pl
+  rcnMedianPriceM2?: number;
+  rcnTransactionCount?: number;
+  rcnCountPrimary?: number;
+  rcnCountSecondary?: number;
+  rcnMonth?: string;        // 'YYYY-MM-01' of the latest data month
 }
 
 export interface DistrictCenter {
