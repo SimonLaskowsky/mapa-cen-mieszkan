@@ -15,13 +15,14 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Normalize district name for consistency
+// NOTE: ł (U+0142) has no NFD decomposition and must NOT be stripped —
+// keep it so the name matches what the scraper's normalizeDistrict() produces.
 function normalizeDistrictName(name: string): string {
   return name
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '');
+    .replace(/[\u0300-\u036f]/g, '') // remove combining diacritics (ę→e, ó→o, ą→a …)
+    .replace(/\s+/g, '-');
 }
 
 async function main() {
@@ -38,7 +39,7 @@ async function main() {
     return {
       city: 'katowice',
       district: normalizedName,
-      geojson: feature.geometry,
+      geojson: feature,
       center_lat: feature.properties.center_lat,
       center_lng: feature.properties.center_lng,
     };
@@ -59,6 +60,14 @@ async function main() {
   }
 
   console.log(`\n✅ Successfully inserted/updated ${data?.length || 0} districts`);
+
+  // Refresh PostGIS geometry column from JSONB
+  const { error: rpcError } = await supabase.rpc('refresh_district_geometries' as never);
+  if (rpcError) {
+    console.error('⚠️  Error refreshing geometries:', rpcError.message);
+  } else {
+    console.log('🗺️  PostGIS geometries refreshed');
+  }
 }
 
 main().catch(console.error);

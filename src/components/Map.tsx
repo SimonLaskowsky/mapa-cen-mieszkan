@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { CITIES, findCityAtPoint } from '@/lib/cities';
+import { CITIES, CITY_ORDER } from '@/lib/cities';
 import { formatPrice, formatPercent, type DistrictStats, type CityData } from '@/lib/city-data';
 import { useSoundEffects } from '@/lib/useSoundEffects';
 
@@ -19,12 +19,6 @@ interface Listing {
   url: string;
   thumbnailUrl: string | null;
 }
-
-// ============================================
-// FEATURE FLAG: Restrict map panning to city bounds
-// Set to false to allow free scrolling across all cities
-// ============================================
-const RESTRICT_TO_CITY_BOUNDS = true;
 
 // Map frontend city IDs to API slugs
 const CITY_API_SLUGS: Record<string, string> = {
@@ -55,7 +49,7 @@ interface MapProps {
   cityId: string;
   cityData: CityData;
   offerType?: 'sale' | 'rent';
-  onCityChange?: (cityId: string) => void;
+  onBoundsChange?: (bbox: [number, number, number, number]) => void;
   onDistrictSelect?: (district: DistrictStats | null) => void;
   searchLocation?: SearchLocation | null;
   focusedDistrict?: string | null;
@@ -68,6 +62,7 @@ interface MapProps {
   hoveredListingId?: string;
   ignoredListings?: Set<string>;
   favouriteListings?: Set<string>;
+  flyToCity?: string | null;
 }
 
 // Get price tier (1-6) for color coding based on offer type
@@ -121,6 +116,30 @@ function getPriceBars(tier: number): string {
   return '█'.repeat(filled) + '░'.repeat(empty);
 }
 
+function buildRcnSection(stats: DistrictStats, offerType: string): string {
+  if (offerType !== 'sale' || !stats.rcnMedianPriceM2) return '';
+  const offerDiff = (stats.medianPriceM2 - stats.rcnMedianPriceM2) / stats.rcnMedianPriceM2 * 100;
+  const diffColor = offerDiff > 0 ? '#f97316' : '#22c55e';
+  const sign = offerDiff > 0 ? '+' : '';
+  const monthStr = stats.rcnMonth ? stats.rcnMonth.slice(0, 7) : '';
+  return `<div style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 8px; padding-top: 8px; display: grid; gap: 6px;">
+              <div style="font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.08em;">TRANSACTION PRICES (RCN)</div>
+              <div style="display: flex; justify-content: space-between; gap: 4px;">
+                <span style="color: rgba(255,255,255,0.5);">MEDIAN TRANSACTED/M²</span>
+                <span style="color: #a78bfa; font-weight: 600;">${formatPrice(stats.rcnMedianPriceM2)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; gap: 4px;">
+                <span style="color: rgba(255,255,255,0.5);">OFFER vs ACTUAL</span>
+                <span style="color: ${diffColor};">${sign}${offerDiff.toFixed(1)}% ${offerDiff > 0 ? 'above' : 'below'}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; gap: 4px;">
+                <span style="color: rgba(255,255,255,0.5);">TRANSACTIONS</span>
+                <span style="color: white;">${stats.rcnTransactionCount ?? '—'}</span>
+              </div>
+              ${monthStr ? `<div style="color: rgba(255,255,255,0.25); font-size: 10px; text-align: right;">data: ${monthStr}</div>` : ''}
+            </div>`;
+}
+
 function getPriceThreatLevel(price: number, offerType: 'sale' | 'rent' = 'sale'): { label: string; color: string } {
   if (offerType === 'rent') {
     if (price < 2500) return { label: 'LOW', color: '#22c55e' };
@@ -139,7 +158,7 @@ function getPriceThreatLevel(price: number, offerType: 'sale' | 'rent' = 'sale')
   }
 }
 
-export default function Map({ cityId, cityData, offerType = 'sale', onCityChange, onDistrictSelect, searchLocation, focusedDistrict, onDistrictClick, showListings = true, showDistrictLabels = true, showHeatmap = true, showDistrictFill = true, listingFilters, hoveredListingId, ignoredListings, favouriteListings }: MapProps) {
+export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChange, onDistrictSelect, searchLocation, focusedDistrict, onDistrictClick, showListings = true, showDistrictLabels = true, showHeatmap = true, showDistrictFill = true, listingFilters, hoveredListingId, ignoredListings, favouriteListings, flyToCity }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popup = useRef<maplibregl.Popup | null>(null);
@@ -160,7 +179,9 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
   const favouriteListingsRef = useRef(favouriteListings);
 
   // Get current city config
-  const cityConfig = CITIES[cityId];
+  const cityConfig = CITIES[cityId] || CITIES['warsaw'];
+  const onBoundsChangeRef = useRef(onBoundsChange);
+  useEffect(() => { onBoundsChangeRef.current = onBoundsChange; }, [onBoundsChange]);
 
   // Keep refs updated
   useEffect(() => {
@@ -339,7 +360,8 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
         a.click();
       });
 
-      el.style.display = showListingsRef.current ? 'block' : 'none';
+      const currentZoom = mapInstance.getZoom();
+      el.style.display = (showListingsRef.current && currentZoom >= 10.5) ? 'block' : 'none';
 
       // Store element reference by listing ID for hover highlighting
       listingMarkerElementsRef.current[listing.id] = el;
@@ -395,7 +417,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
         <div class="district-marker-content" style="--tier-color: ${color};">
           <div class="marker-name">${displayName}</div>
           <div class="marker-bars" style="color: ${color};">${bars}</div>
-          <div class="marker-price">${(displayPrice / 1000).toFixed(1)}k</div>
+          <div class="marker-price" style="color: ${color};">${(displayPrice / 1000).toFixed(1)}k</div>
           ${rangeHtml}
           <div class="marker-meta">
             <span class="marker-listings">${stats.listingCount}</span>
@@ -404,7 +426,8 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
         </div>
       `;
 
-      el.style.display = showDistrictLabelsRef.current ? 'block' : 'none';
+      const zoom = mapInstance.getZoom();
+      el.style.display = (showDistrictLabelsRef.current && zoom >= 11.5) ? 'block' : 'none';
 
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([district.lng, district.lat])
@@ -421,8 +444,9 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
       type: 'FeatureCollection' as const,
       features: data.DISTRICTS_GEOJSON.features.map((feature) => {
         const stats = data.DISTRICT_STATS[feature.properties.name];
+        const hasData = !!(stats && stats.avgPriceM2 > 0);
         const displayPrice = stats ? (offerType === 'rent' ? (stats.avgPrice || 0) : stats.avgPriceM2) : 0;
-        const tier = stats ? getPriceTier(displayPrice, offerType) : 3;
+        const tier = hasData ? getPriceTier(displayPrice, offerType) : 0;
         return {
           type: 'Feature' as const,
           id: feature.id,
@@ -430,7 +454,8 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
           properties: {
             ...feature.properties,
             priceTier: tier,
-            color: getTierColor(tier),
+            hasData,
+            color: hasData ? getTierColor(tier) : '#666',
           },
         };
       }),
@@ -450,16 +475,11 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    // Add padding to bounds so districts at edges aren't cut off
-    const paddedBounds = RESTRICT_TO_CITY_BOUNDS ? [
-      [cityConfig.bounds[0][0] - 0.02, cityConfig.bounds[0][1] - 0.02], // SW with padding
-      [cityConfig.bounds[1][0] + 0.02, cityConfig.bounds[1][1] + 0.02], // NE with padding
-    ] as [[number, number], [number, number]] : undefined;
-
     map.current = new maplibregl.Map({
       container: mapContainer.current,
       style: {
         version: 8,
+        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
         sources: {
           'carto-dark': {
             type: 'raster',
@@ -484,9 +504,12 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
       },
       center: cityConfig.center,
       zoom: cityConfig.zoom,
-      minZoom: 8,
+      minZoom: 9,
       maxZoom: 16,
-      maxBounds: paddedBounds,
+      maxBounds: [
+        [13.5, 48.5], // SW corner of Poland (with padding)
+        [24.5, 55.5], // NE corner of Poland (with padding)
+      ],
     });
 
     map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -498,29 +521,136 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
       offset: 25,
     });
 
-    // Auto-detect city on moveend
-    map.current.on('moveend', () => {
-      if (!map.current || !onCityChange) return;
+    // Fire bounds on moveend
+    const fireBounds = () => {
+      if (!map.current) return;
+      const bounds = map.current.getBounds();
+      onBoundsChangeRef.current?.([
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth(),
+      ]);
+    };
+    map.current.on('moveend', fireBounds);
 
-      const center = map.current.getCenter();
-      const detectedCity = findCityAtPoint(center.lng, center.lat);
-
-      if (detectedCity && detectedCity !== currentCityRef.current) {
-        currentCityRef.current = detectedCity;
-        onCityChange(detectedCity);
-      }
-    });
+    // Hide district markers when zoomed out too far
+    const DISTRICT_LABEL_MIN_ZOOM = 11.5;
+    const updateMarkerVisibility = () => {
+      if (!map.current) return;
+      const zoom = map.current.getZoom();
+      const visible = zoom >= DISTRICT_LABEL_MIN_ZOOM && showDistrictLabelsRef.current;
+      markersRef.current.forEach(marker => {
+        marker.getElement().style.display = visible ? 'block' : 'none';
+      });
+      const listingsVisible = zoom >= DISTRICT_LABEL_MIN_ZOOM && showListingsRef.current;
+      listingMarkersRef.current.forEach(marker => {
+        marker.getElement().style.display = listingsVisible ? 'block' : 'none';
+      });
+    };
+    map.current.on('zoom', updateMarkerVisibility);
 
     map.current.on('load', () => {
       if (!map.current) return;
+
+      // Fire initial bounds
+      fireBounds();
+
+      // === City boundary outlines (instant, no API needed) ===
+      const cityBoundaryFeatures = CITY_ORDER.map((id) => {
+        const c = CITIES[id];
+        const [[swLng, swLat], [neLng, neLat]] = c.bounds;
+        return {
+          type: 'Feature' as const,
+          geometry: {
+            type: 'Polygon' as const,
+            coordinates: [[
+              [swLng, swLat],
+              [neLng, swLat],
+              [neLng, neLat],
+              [swLng, neLat],
+              [swLng, swLat],
+            ]],
+          },
+          properties: { name: c.name, id: c.id },
+        };
+      });
+
+      const cityLabelFeatures = CITY_ORDER.map((id) => {
+        const c = CITIES[id];
+        return {
+          type: 'Feature' as const,
+          geometry: {
+            type: 'Point' as const,
+            coordinates: c.center,
+          },
+          properties: { name: c.name },
+        };
+      });
+
+      map.current.addSource('city-boundaries', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: cityBoundaryFeatures } as GeoJSON.FeatureCollection,
+      });
+
+      map.current.addSource('city-labels', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: cityLabelFeatures } as GeoJSON.FeatureCollection,
+      });
+
+      // Dashed border for each city
+      map.current.addLayer({
+        id: 'city-boundary-line',
+        type: 'line',
+        source: 'city-boundaries',
+        paint: {
+          'line-color': '#00d4aa',
+          'line-width': 1,
+          'line-opacity': 0.3,
+          'line-dasharray': [4, 4],
+        },
+      });
+
+      // Subtle fill so cities are visible when zoomed out
+      map.current.addLayer({
+        id: 'city-boundary-fill',
+        type: 'fill',
+        source: 'city-boundaries',
+        paint: {
+          'fill-color': '#00d4aa',
+          'fill-opacity': 0.03,
+        },
+      });
+
+      // City name labels
+      map.current.addLayer({
+        id: 'city-labels',
+        type: 'symbol',
+        source: 'city-labels',
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-font': ['Open Sans Regular'],
+          'text-size': 14,
+          'text-transform': 'uppercase',
+          'text-letter-spacing': 0.15,
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': '#00d4aa',
+          'text-opacity': 0.5,
+          'text-halo-color': '#05080a',
+          'text-halo-width': 2,
+        },
+      });
 
       // Prepare initial GeoJSON
       const geoJSONWithPrices = {
         type: 'FeatureCollection' as const,
         features: cityData.DISTRICTS_GEOJSON.features.map((feature) => {
           const stats = cityData.DISTRICT_STATS[feature.properties.name];
+          const hasData = !!(stats && stats.avgPriceM2 > 0);
           const displayPrice = stats ? (offerType === 'rent' ? (stats.avgPrice || 0) : stats.avgPriceM2) : 0;
-          const tier = stats ? getPriceTier(displayPrice, offerType) : 3;
+          const tier = hasData ? getPriceTier(displayPrice, offerType) : 0;
           return {
             type: 'Feature' as const,
             id: feature.id,
@@ -528,7 +658,8 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
             properties: {
               ...feature.properties,
               priceTier: tier,
-              color: getTierColor(tier),
+              hasData,
+              color: hasData ? getTierColor(tier) : '#666',
             },
           };
         }),
@@ -539,7 +670,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
         data: geoJSONWithPrices as GeoJSON.FeatureCollection,
       });
 
-      // District fill
+      // District fill - subtle tint for districts without data
       map.current.addLayer({
         id: 'district-fill',
         type: 'fill',
@@ -548,6 +679,8 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
           'fill-color': ['get', 'color'],
           'fill-opacity': showDistrictFill ? [
             'case',
+            ['!', ['get', 'hasData']],
+            0.06,
             ['boolean', ['feature-state', 'hover'], false],
             0.35,
             0.15
@@ -555,7 +688,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
         },
       });
 
-      // District borders
+      // District borders - neutral for districts without data
       map.current.addLayer({
         id: 'district-borders',
         type: 'line',
@@ -564,12 +697,16 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
           'line-color': ['get', 'color'],
           'line-width': [
             'case',
+            ['!', ['get', 'hasData']],
+            0.8,
             ['boolean', ['feature-state', 'hover'], false],
             2.5,
             1
           ],
           'line-opacity': [
             'case',
+            ['!', ['get', 'hasData']],
+            0.5,
             ['boolean', ['feature-state', 'hover'], false],
             1,
             0.6
@@ -586,7 +723,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
       map.current.on('mousemove', 'district-fill', (e) => {
         if (!map.current || !e.features?.[0]) return;
 
-        map.current.getCanvas().style.cursor = 'pointer';
+        map.current.getCanvas().style.cursor = 'inherit';
 
         const newId = e.features[0].id ?? null;
 
@@ -654,7 +791,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
 
         const html = `
           <div style="font-family: ui-monospace, monospace;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid ${tierColor}40;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
               <span style="font-size: 14px; font-weight: 600; color: white;">${displayName.toUpperCase()}</span>
               <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${tierColor}20; color: ${tierColor}; border: 1px solid ${tierColor}40;">${threatLevel.label}</span>
             </div>
@@ -683,6 +820,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
                 <span style="color: rgba(255,255,255,0.5);">GROSS YIELD</span>
                 <span style="color: ${stats.rentalYield >= 5 ? '#22c55e' : stats.rentalYield >= 4 ? '#eab308' : '#ef4444'}; font-weight: 600;">${stats.rentalYield.toFixed(1)}%</span>
               </div>` : ''}
+              ${buildRcnSection(stats, currentOfferType)}
             </div>
           </div>
         `;
@@ -703,39 +841,28 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle city/data change
+  // Handle data change (viewport districts updated)
   useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded()) return;
 
     currentCityRef.current = cityId;
-    const config = CITIES[cityId];
 
-    // Update bounds restriction when city changes
-    if (RESTRICT_TO_CITY_BOUNDS) {
-      const paddedBounds: [[number, number], [number, number]] = [
-        [config.bounds[0][0] - 0.02, config.bounds[0][1] - 0.02],
-        [config.bounds[1][0] + 0.02, config.bounds[1][1] + 0.02],
-      ];
-      map.current.setMaxBounds(paddedBounds);
-    }
+    // Update district polygons and markers with new viewport data
+    updateMapData(map.current, cityData);
+  }, [cityId, cityData, updateMapData]);
 
-    // Fly to new city
+  // Handle flyToCity
+  useEffect(() => {
+    if (!map.current || !flyToCity) return;
+    const config = CITIES[flyToCity];
+    if (!config) return;
+
     map.current.flyTo({
       center: config.center,
       zoom: config.zoom,
       duration: 1500,
     });
-
-    // Update data with current cityData
-    updateMapData(map.current, cityData);
-
-    // Close any open popup and clear listing markers/heatmap
-    if (popup.current) popup.current.remove();
-    clearListingMarkers();
-    if (map.current.getLayer('listings-heat')) map.current.removeLayer('listings-heat');
-    if (map.current.getSource('listings-data')) map.current.removeSource('listings-data');
-    if (map.current.getSource('listings-heat-data')) map.current.removeSource('listings-heat-data');
-  }, [cityId, cityData, updateMapData, clearListingMarkers]);
+  }, [flyToCity]);
 
   // Handle search location marker
   useEffect(() => {
@@ -806,7 +933,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
 
     const html = `
       <div style="font-family: ui-monospace, monospace;">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid ${tierColor}40;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
           <span style="font-size: 14px; font-weight: 600; color: white;">${displayName.toUpperCase()}</span>
           <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${tierColor}20; color: ${tierColor}; border: 1px solid ${tierColor}40;">${threatLevel.label}</span>
         </div>
@@ -835,6 +962,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
             <span style="color: rgba(255,255,255,0.5);">GROSS YIELD</span>
             <span style="color: ${stats.rentalYield >= 5 ? '#22c55e' : stats.rentalYield >= 4 ? '#eab308' : '#ef4444'}; font-weight: 600;">${stats.rentalYield.toFixed(1)}%</span>
           </div>` : ''}
+          ${buildRcnSection(stats, currentOfferType)}
         </div>
       </div>
     `;
@@ -972,17 +1100,22 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
     fetchListings();
   }, [focusedDistrict, cityId, offerType, clearListingMarkers, addListingMarkers, showListings, showHeatmap, listingFilters, playSound]);
 
-  // Toggle district labels visibility
+  // Toggle district labels visibility (respects zoom)
   useEffect(() => {
+    const zoom = map.current?.getZoom() ?? 11;
+    const visible = showDistrictLabels && zoom >= 11.5;
     markersRef.current.forEach(marker => {
-      marker.getElement().style.display = showDistrictLabels ? 'block' : 'none';
+      marker.getElement().style.display = visible ? 'block' : 'none';
     });
   }, [showDistrictLabels]);
 
-  // Toggle listing markers visibility
+  // Toggle listing markers visibility (respects zoom)
   useEffect(() => {
+    const zoom = map.current?.getZoom() ?? 11;
+    console.log('zoom:',zoom);
+    const visible = showListings && zoom >= 7;
     listingMarkersRef.current.forEach(marker => {
-      marker.getElement().style.display = showListings ? 'block' : 'none';
+      marker.getElement().style.display = visible ? 'block' : 'none';
     });
   }, [showListings]);
 
@@ -994,12 +1127,14 @@ export default function Map({ cityId, cityData, offerType = 'sale', onCityChange
     }
   }, [showHeatmap]);
 
-  // Toggle district fill visibility (keep borders)
+  // Toggle district fill visibility (keep borders, no fill for no-data districts)
   useEffect(() => {
     if (!map.current) return;
     if (map.current.getLayer('district-fill')) {
       map.current.setPaintProperty('district-fill', 'fill-opacity', showDistrictFill ? [
         'case',
+        ['!', ['get', 'hasData']],
+        0,
         ['boolean', ['feature-state', 'hover'], false],
         0.35,
         0.15

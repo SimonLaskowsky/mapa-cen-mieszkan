@@ -14,7 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pl">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {children}
+      </body>
     </html>
   );
 }

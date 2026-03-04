@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Legend from '@/components/Legend';
 import StatsPanel from '@/components/StatsPanel';
@@ -9,7 +9,7 @@ import CitySelector from '@/components/CitySelector';
 import AddressSearch from '@/components/AddressSearch';
 import CountUp from '@/components/CountUp';
 import { CITIES } from '@/lib/cities';
-import { useDistrictData } from '@/lib/useDistrictData';
+import { useViewportDistricts, type Bbox } from '@/lib/useViewportDistricts';
 import { useSoundEffects } from '@/lib/useSoundEffects';
 
 interface SearchLocation {
@@ -28,6 +28,11 @@ const CITY_API_SLUGS: Record<string, string> = {
   poznan: 'poznan',
   lodz: 'lodz',
 };
+
+// Reverse map: API slug -> frontend city ID
+const SLUG_TO_CITY: Record<string, string> = Object.fromEntries(
+  Object.entries(CITY_API_SLUGS).map(([k, v]) => [v, k])
+);
 
 // Get tier color for legend
 function getTierColor(price: number): string {
@@ -51,10 +56,12 @@ const Map = dynamic(() => import('@/components/Map'), {
 
 export default function Home() {
   const [currentCity, setCurrentCity] = useState('warsaw');
+  const [flyToCity, setFlyToCity] = useState<string | null>(null);
   const [searchLocation, setSearchLocation] = useState<SearchLocation | null>(null);
   const [focusedDistrict, setFocusedDistrict] = useState<string | null>(null);
   const [hoveredListing, setHoveredListing] = useState<{ id: string; lat: number; lng: number } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [bbox, setBbox] = useState<Bbox | null>(null);
 
   // Map display options
   const [offerType, setOfferType] = useState<'sale' | 'rent'>('sale');
@@ -134,14 +141,43 @@ export default function Home() {
     rooms: selectedRooms.length > 0 ? selectedRooms : undefined,
   }), [minPrice, maxPrice, minSize, maxSize, selectedRooms]);
 
-  const cityConfig = CITIES[currentCity];
-  const { data: cityData, loading, error, updatedAt } = useDistrictData(currentCity, offerType);
+  // Viewport-based district data
+  const { data: cityData, loading, error, updatedAt, visibleCities } = useViewportDistricts(bbox, offerType);
   const { playSound, setEnabled } = useSoundEffects();
+
+  // Derive currentCity from visible cities
+  useEffect(() => {
+    if (visibleCities.length > 0) {
+      // Prefer the first visible city, mapped back to frontend ID
+      const frontendCity = SLUG_TO_CITY[visibleCities[0]] || visibleCities[0];
+      if (frontendCity !== currentCity && CITIES[frontendCity]) {
+        setCurrentCity(frontendCity);
+      }
+    }
+  }, [visibleCities, currentCity]);
+
+  const cityConfig = CITIES[currentCity] || CITIES['warsaw'];
 
   // Sync sound enabled state
   useEffect(() => {
     setEnabled(soundEnabled);
   }, [soundEnabled, setEnabled]);
+
+  // Handle bounds change from map
+  const handleBoundsChange = useCallback((newBbox: [number, number, number, number]) => {
+    setBbox(newBbox);
+  }, []);
+
+  // Handle city change from selector (fly to city)
+  const handleCityChange = useCallback((city: string) => {
+    playSound('swoosh');
+    setFlyToCity(city);
+    setCurrentCity(city);
+    setSearchLocation(null);
+    setFocusedDistrict(null);
+    // Reset flyToCity after a tick so the effect can re-trigger for the same city
+    setTimeout(() => setFlyToCity(null), 100);
+  }, [playSound]);
 
   // Calculate city-wide stats
   const cityStats = useMemo(() => {
@@ -194,6 +230,9 @@ export default function Home() {
     setFocusedDistrict(district);
     setMobileMenuOpen(false);
   };
+
+  // Derive city slug for API calls (listings, trend chart)
+  const citySlug = CITY_API_SLUGS[currentCity] || currentCity;
 
   const renderSidebarPanels = (onDistrictSelect: (d: string | null) => void) => (
     <>
@@ -401,7 +440,7 @@ export default function Home() {
             {cityData ? (
               <StatsPanel
                 cityData={cityData}
-                citySlug={CITY_API_SLUGS[currentCity] || currentCity}
+                citySlug={citySlug}
                 selectedDistrict={focusedDistrict}
                 onDistrictSelect={onDistrictSelect}
               />
@@ -423,8 +462,8 @@ export default function Home() {
       {/* Header - Command Bar */}
       <header className="flex-shrink-0 px-4 py-3 border-b border-[#00d4aa15]">
         <div className="flex items-center justify-between">
-          {/* Left - Title & City Selector */}
-          <div className="flex items-center gap-4">
+          {/* Left - Title */}
+          <div className="flex items-center gap-4 shrink-0">
             {/* Hamburger - Mobile only */}
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -445,35 +484,32 @@ export default function Home() {
               <span className="text-gray-500">{' // '}</span>
               <span className="text-white">PRICE MONITOR</span>
             </h1>
-            <div className="h-4 w-px bg-[#00d4aa20] hidden lg:block" />
+          </div>
+
+          {/* Center - City Selector (fills available space) */}
+          <div className="flex-1 min-w-0 mx-3">
             <CitySelector
                 currentCity={currentCity}
-                onCityChange={(city) => {
-                  playSound('swoosh');
-                  setCurrentCity(city);
-                  setSearchLocation(null);
-                  setFocusedDistrict(null);
-                }}
+                onCityChange={handleCityChange}
               />
           </div>
 
-          {/* Center - Location */}
-          <div className="hidden md:flex items-center gap-6">
-            <div className="text-center">
-              <p className="tactical-label">REGION</p>
-              <p className="font-mono text-sm text-white">{cityConfig.name.toUpperCase()}</p>
+          {/* Right - Location & Time */}
+          <div className="hidden sm:flex items-center gap-4 shrink-0">
+            <div className="hidden md:flex items-center gap-4">
+              <div className="text-center">
+                <p className="tactical-label">REGION</p>
+                <p className="font-mono text-sm text-white">{cityConfig.name.toUpperCase()}</p>
+              </div>
+              <div className="h-8 w-px bg-[#00d4aa20]" />
+              <div className="text-center">
+                <p className="tactical-label">COORDINATES</p>
+                <p className="font-mono text-sm text-[#00d4aa]">
+                  {cityConfig.center[1].toFixed(4)}°N {cityConfig.center[0].toFixed(4)}°E
+                </p>
+              </div>
+              <div className="h-8 w-px bg-[#00d4aa20]" />
             </div>
-            <div className="h-8 w-px bg-[#00d4aa20]" />
-            <div className="text-center">
-              <p className="tactical-label">COORDINATES</p>
-              <p className="font-mono text-sm text-[#00d4aa]">
-                {cityConfig.center[1].toFixed(4)}°N {cityConfig.center[0].toFixed(4)}°E
-              </p>
-            </div>
-          </div>
-
-          {/* Right - Time */}
-          <div className="hidden sm:flex items-center gap-4">
             <div className="text-right">
               <p className="tactical-label">LOCAL TIME</p>
               <p className="font-mono text-sm text-white">{timeString ?? '--:--:--'}</p>
@@ -498,44 +534,46 @@ export default function Home() {
         <div className="flex-1 flex flex-col gap-3">
           {/* Map */}
           <div className="flex-1 relative tactical-panel tactical-panel-bottom rounded-lg overflow-hidden">
-            {loading ? (
-              <div className="w-full h-full flex items-center justify-center bg-[#0a1218]">
-                <div className="text-center">
-                  <div className="text-[#00d4aa] font-mono text-sm animate-pulse">LOADING DATA...</div>
-                  <div className="text-gray-600 font-mono text-xs mt-2">Fetching district statistics</div>
+            <Map
+              cityId={currentCity}
+              cityData={cityData || { DISTRICT_STATS: {}, DISTRICT_CENTERS: [], DISTRICTS_GEOJSON: { type: 'FeatureCollection', features: [] } }}
+              offerType={offerType}
+              onBoundsChange={handleBoundsChange}
+              searchLocation={searchLocation}
+              focusedDistrict={focusedDistrict}
+              onDistrictClick={setFocusedDistrict}
+              showListings={showListings}
+              showDistrictLabels={showDistrictLabels}
+              showHeatmap={showHeatmap}
+              showDistrictFill={showDistrictFill}
+              listingFilters={listingFilters}
+              hoveredListingId={hoveredListing?.id}
+              ignoredListings={ignoredListings}
+              favouriteListings={favouriteListings}
+              flyToCity={flyToCity}
+            />
+
+            {/* Status overlay - top right */}
+            <div className="absolute top-3 right-3 z-[10] flex flex-col gap-1.5 items-end">
+              {loading && (
+                <div className="tactical-panel rounded px-3 py-1.5 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full animate-pulse" />
+                  <span className="font-mono text-xs text-[#00d4aa] animate-pulse">LOADING DISTRICTS...</span>
                 </div>
-              </div>
-            ) : error ? (
-              <div className="w-full h-full flex items-center justify-center bg-[#0a1218]">
-                <div className="text-center">
-                  <div className="text-red-400 font-mono text-sm">DATA UNAVAILABLE</div>
-                  <div className="text-gray-600 font-mono text-xs mt-2">{error}</div>
+              )}
+              {!loading && visibleCities.length > 0 && (
+                <div className="tactical-panel rounded px-3 py-1.5 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
+                  <span className="font-mono text-[10px] text-gray-400">AREA</span>
+                  <span className="font-mono text-xs text-white">
+                    {visibleCities.map(slug => {
+                      const fid = SLUG_TO_CITY[slug] || slug;
+                      return (CITIES[fid]?.name || slug).toUpperCase();
+                    }).join(' / ')}
+                  </span>
                 </div>
-              </div>
-            ) : cityData ? (
-              <Map
-                key={`${currentCity}-${offerType}`}
-                cityId={currentCity}
-                cityData={cityData}
-                offerType={offerType}
-                onCityChange={(city) => {
-                  setCurrentCity(city);
-                  setSearchLocation(null);
-                  setFocusedDistrict(null);
-                }}
-                searchLocation={searchLocation}
-                focusedDistrict={focusedDistrict}
-                onDistrictClick={setFocusedDistrict}
-                showListings={showListings}
-                showDistrictLabels={showDistrictLabels}
-                showHeatmap={showHeatmap}
-                showDistrictFill={showDistrictFill}
-                listingFilters={listingFilters}
-                hoveredListingId={hoveredListing?.id}
-                ignoredListings={ignoredListings}
-                favouriteListings={favouriteListings}
-              />
-            ) : null}
+              )}
+            </div>
 
             {/* Map Overlays */}
             <div className="absolute top-3 left-3 z-[10] flex items-center gap-2">
@@ -554,7 +592,7 @@ export default function Home() {
               />
             </div>
 
-            
+
             <div className="absolute bottom-3 left-3 z-[10] flex flex-col gap-2">
               <div className="tactical-panel rounded px-3 py-1.5">
                 <span className="font-mono text-xs text-gray-400">{cityStats.districtCount} DISTRICTS MONITORED</span>
@@ -584,7 +622,7 @@ export default function Home() {
               {focusedDistrict && cityData && (
                 <div className="h-full tactical-panel border-l border-[#00d4aa15]">
                   <ListingsPanel
-                    city={CITY_API_SLUGS[currentCity] || currentCity}
+                    city={citySlug}
                     district={focusedDistrict}
                     offerType={offerType}
                     onListingHover={(listing) => setHoveredListing(listing ? { id: listing.id, lat: listing.lat, lng: listing.lng } : null)}

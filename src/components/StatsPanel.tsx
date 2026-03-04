@@ -1,17 +1,9 @@
 'use client';
 
-import { formatPercent, type CityData } from '@/lib/city-data';
+import { formatPercent, type CityData, type DistrictStats } from '@/lib/city-data';
 import TrendChart from './TrendChart';
 import CountUp from './CountUp';
 import { useSoundEffects } from '@/lib/useSoundEffects';
-
-function getYieldColor(yieldValue: number): string {
-  if (yieldValue >= 7) return 'text-green-400';
-  if (yieldValue >= 5) return 'text-lime-400';
-  if (yieldValue >= 4) return 'text-yellow-400';
-  if (yieldValue >= 3) return 'text-orange-400';
-  return 'text-red-400';
-}
 
 interface StatsPanelProps {
   cityData: CityData;
@@ -33,6 +25,9 @@ export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDis
     .filter(d => d.avgPriceM2 > 0) // Filter out districts with no data
     .sort((a, b) => b.avgPriceM2 - a.avgPriceM2);
 
+  // Show TXN column only when at least one district has RCN data
+  const hasRcnData = sortedDistricts.some((d: DistrictStats) => d.rcnMedianPriceM2);
+
   return (
     <div className="h-full flex flex-col">
       {/* Header row */}
@@ -40,8 +35,8 @@ export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDis
         <span className="font-mono text-[10px] text-gray-600 w-6">#</span>
         <span className="font-mono text-[10px] text-gray-600 flex-1">DISTRICT</span>
         <span className="font-mono text-[10px] text-gray-600 w-16 text-right">PRICE</span>
-        <span className="font-mono text-[10px] text-gray-600 w-12 text-right">YIELD</span>
         <span className="font-mono text-[10px] text-gray-600 w-12 text-right">Δ30D</span>
+        {hasRcnData && <span className="font-mono text-[10px] text-purple-400 w-12 text-right">TXN</span>}
       </div>
 
       {/* District list */}
@@ -76,12 +71,14 @@ export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDis
               <span className="font-mono text-xs text-white w-16 text-right">
                 {(district.avgPriceM2 / 1000).toFixed(1)}K
               </span>
-              <span className={`font-mono text-xs w-12 text-right ${district.rentalYield ? getYieldColor(district.rentalYield) : 'text-gray-600'}`}>
-                {district.rentalYield ? `${district.rentalYield.toFixed(1)}%` : '—'}
-              </span>
               <span className={`font-mono text-xs w-12 text-right ${changeColor}`}>
                 {formatPercent(district.change30d)}
               </span>
+              {hasRcnData && (
+                <span className="font-mono text-xs w-12 text-right text-purple-400">
+                  {district.rcnMedianPriceM2 ? `${(district.rcnMedianPriceM2 / 1000).toFixed(1)}K` : '—'}
+                </span>
+              )}
             </div>
           );
         })}
