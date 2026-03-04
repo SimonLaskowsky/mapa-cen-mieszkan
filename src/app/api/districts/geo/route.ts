@@ -194,7 +194,15 @@ export async function GET(request: NextRequest) {
 
       // Build stats entry
       if (stat) {
-        const entry = {
+        const entry: {
+          district: string; city: string; offerType: string;
+          avgPrice: number; avgPriceM2: number; medianPriceM2: number;
+          minPriceM2: number | undefined; maxPriceM2: number | undefined;
+          listingCount: number; change30d: number; avgSize: number;
+          rentalYield: number | undefined;
+          rcnMedianPriceM2?: number; rcnTransactionCount?: number;
+          rcnCountPrimary?: number; rcnCountSecondary?: number; rcnMonth?: string;
+        } = {
           district: d.district,
           city: d.city,
           offerType,
@@ -206,7 +214,7 @@ export async function GET(request: NextRequest) {
           listingCount: stat.listing_count || 0,
           change30d: change?.change_percent_30d || 0,
           avgSize: stat.avg_size_m2 || 0,
-          rentalYield: undefined as number | undefined,
+          rentalYield: undefined,
         };
 
         // Compute rental yield
