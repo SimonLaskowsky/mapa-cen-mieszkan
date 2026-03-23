@@ -11,6 +11,7 @@ import CountUp from '@/components/CountUp';
 import { CITIES } from '@/lib/cities';
 import { useViewportDistricts, type Bbox } from '@/lib/useViewportDistricts';
 import { useSoundEffects } from '@/lib/useSoundEffects';
+import { useDebounce } from '@/lib/useDebounce';
 
 interface SearchLocation {
   lat: number;
@@ -132,14 +133,19 @@ export default function Home() {
     });
   };
 
-  // Memoize filters object to avoid unnecessary re-renders
+  // Debounce text filter inputs so API only fires 500ms after user stops typing
+  const debouncedMinPrice = useDebounce(minPrice, 500);
+  const debouncedMaxPrice = useDebounce(maxPrice, 500);
+  const debouncedMinSize = useDebounce(minSize, 500);
+  const debouncedMaxSize = useDebounce(maxSize, 500);
+
   const listingFilters = useMemo(() => ({
-    minPrice: minPrice ? parseInt(minPrice, 10) : undefined,
-    maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
-    minSize: minSize ? parseInt(minSize, 10) : undefined,
-    maxSize: maxSize ? parseInt(maxSize, 10) : undefined,
+    minPrice: debouncedMinPrice ? parseInt(debouncedMinPrice, 10) : undefined,
+    maxPrice: debouncedMaxPrice ? parseInt(debouncedMaxPrice, 10) : undefined,
+    minSize: debouncedMinSize ? parseInt(debouncedMinSize, 10) : undefined,
+    maxSize: debouncedMaxSize ? parseInt(debouncedMaxSize, 10) : undefined,
     rooms: selectedRooms.length > 0 ? selectedRooms : undefined,
-  }), [minPrice, maxPrice, minSize, maxSize, selectedRooms]);
+  }), [debouncedMinPrice, debouncedMaxPrice, debouncedMinSize, debouncedMaxSize, selectedRooms]);
 
   // Viewport-based district data
   const { data: cityData, loading, error, updatedAt, visibleCities } = useViewportDistricts(bbox, offerType);
@@ -236,6 +242,30 @@ export default function Home() {
 
   const renderSidebarPanels = (onDistrictSelect: (d: string | null) => void) => (
     <>
+      {/* Offer Type Toggle — always visible at top */}
+      <div className="tactical-panel tactical-panel-bottom rounded-lg p-1 flex gap-1 flex-shrink-0">
+        <button
+          onClick={() => { playSound('click'); setOfferType('sale'); }}
+          className={`flex-1 py-2 rounded font-mono text-xs font-semibold tracking-widest transition-colors ${
+            offerType === 'sale'
+              ? 'bg-[#00d4aa] text-black'
+              : 'text-gray-400 hover:bg-[#00d4aa15]'
+          }`}
+        >
+          BUY
+        </button>
+        <button
+          onClick={() => { playSound('click'); setOfferType('rent'); }}
+          className={`flex-1 py-2 rounded font-mono text-xs font-semibold tracking-widest transition-colors ${
+            offerType === 'rent'
+              ? 'bg-[#00d4aa] text-black'
+              : 'text-gray-400 hover:bg-[#00d4aa15]'
+          }`}
+        >
+          RENT
+        </button>
+      </div>
+
       {/* Legend Panel */}
       <div className="tactical-panel tactical-panel-bottom rounded-lg overflow-hidden flex-shrink-0">
         <button
@@ -269,33 +299,6 @@ export default function Home() {
         </button>
         {layersOpen && (
           <div className="px-4 pb-3 flex flex-col gap-3">
-            {/* Offer Type Toggle */}
-            <div className="flex flex-col gap-1">
-              <span className="font-mono text-[10px] text-gray-500 uppercase">Offer Type</span>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => { playSound('click'); setOfferType('sale'); }}
-                  className={`flex-1 px-2 py-1.5 rounded font-mono text-[10px] transition-colors ${
-                    offerType === 'sale'
-                      ? 'bg-[#00d4aa] text-black'
-                      : 'bg-[#00d4aa15] text-gray-400 hover:bg-[#00d4aa25]'
-                  }`}
-                >
-                  BUY
-                </button>
-                <button
-                  onClick={() => { playSound('click'); setOfferType('rent'); }}
-                  className={`flex-1 px-2 py-1.5 rounded font-mono text-[10px] transition-colors ${
-                    offerType === 'rent'
-                      ? 'bg-[#00d4aa] text-black'
-                      : 'bg-[#00d4aa15] text-gray-400 hover:bg-[#00d4aa25]'
-                  }`}
-                >
-                  RENT
-                </button>
-              </div>
-            </div>
-
             {/* Layer Toggles */}
             <div className="flex flex-col gap-2">
               <label className="flex items-center gap-2 cursor-pointer group">
@@ -576,12 +579,31 @@ export default function Home() {
             </div>
 
             {/* Map Overlays */}
-            <div className="absolute top-3 left-3 z-[10] flex items-center gap-2">
-              <div className="tactical-panel rounded px-3 py-1.5 flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                <span className="font-mono text-xs text-red-400">LIVE FEED</span>
-              </div>
-            </div>
+            {(() => {
+              const activeFilterCount = [
+                listingFilters.minPrice, listingFilters.maxPrice,
+                listingFilters.minSize, listingFilters.maxSize,
+              ].filter(Boolean).length + (listingFilters.rooms ? 1 : 0);
+              return (
+                <div className="absolute top-3 left-3 z-[10] flex items-center gap-2">
+                  <div className="tactical-panel rounded px-3 py-1.5 flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
+                    <span className="font-mono text-[10px] text-gray-500">UPDATED</span>
+                    <span className="font-mono text-xs text-[#00d4aa]">
+                      {updatedAt
+                        ? new Date(updatedAt).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                        : '—'}
+                    </span>
+                  </div>
+                  {activeFilterCount > 0 && (
+                    <div className="tactical-panel rounded px-3 py-1.5 flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse" />
+                      <span className="font-mono text-xs text-yellow-400">{activeFilterCount} FILTER{activeFilterCount > 1 ? 'S' : ''} ACTIVE</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Address Search */}
             <div className="absolute top-3 left-1/2 -translate-x-1/2 w-72 z-[45]">
@@ -615,7 +637,7 @@ export default function Home() {
 
             {/* Listings Slide-Over Panel */}
             <div
-              className={`absolute top-0 right-0 h-full w-80 z-[40] transition-transform duration-300 ease-in-out ${
+              className={`absolute top-0 right-0 h-full w-full sm:w-80 z-[40] transition-transform duration-300 ease-in-out ${
                 focusedDistrict && cityData ? 'translate-x-0' : 'translate-x-full'
               }`}
             >

@@ -21,6 +21,7 @@ interface Listing {
 }
 
 type ListingFilter = 'all' | 'favs' | 'hide-ignored';
+type SortBy = 'newest' | 'price_m2_asc' | 'price_asc';
 
 interface ListingFilters {
   minPrice?: number;
@@ -48,6 +49,7 @@ export default function ListingsPanel({ city, district, offerType, filters, onLi
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ListingFilter>('all');
+  const [sortBy, setSortBy] = useState<SortBy>('price_m2_asc');
 
   useEffect(() => {
     const fetchListings = async () => {
@@ -55,7 +57,7 @@ export default function ListingsPanel({ city, district, offerType, filters, onLi
       setError(null);
 
       try {
-        const params = new URLSearchParams({ city, district, offerType, limit: '20' });
+        const params = new URLSearchParams({ city, district, offerType, limit: '20', sortBy });
         if (filters?.minPrice) params.set('minPrice', String(filters.minPrice));
         if (filters?.maxPrice) params.set('maxPrice', String(filters.maxPrice));
         if (filters?.minSize) params.set('minSize', String(filters.minSize));
@@ -75,7 +77,7 @@ export default function ListingsPanel({ city, district, offerType, filters, onLi
     };
 
     fetchListings();
-  }, [city, district, offerType, filters]);
+  }, [city, district, offerType, filters, sortBy]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pl-PL').format(price);
@@ -134,6 +136,28 @@ export default function ListingsPanel({ city, district, offerType, filters, onLi
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
+      </div>
+
+      {/* Sort Bar */}
+      <div className="px-3 py-2 border-b border-[#00d4aa10] flex items-center gap-1 flex-shrink-0">
+        <span className="font-mono text-[10px] text-gray-600 mr-1">SORT</span>
+        {([
+          { value: 'price_m2_asc', label: '€/M² ↑' },
+          { value: 'price_asc',    label: 'PRICE ↑' },
+          { value: 'newest',       label: 'NEW' },
+        ] as { value: SortBy; label: string }[]).map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => setSortBy(opt.value)}
+            className={`px-2 py-1 rounded font-mono text-[10px] transition-colors ${
+              sortBy === opt.value
+                ? 'bg-[#00d4aa] text-black'
+                : 'bg-[#00d4aa15] text-gray-400 hover:bg-[#00d4aa25]'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
       {/* Filter Bar */}

@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
     const district = searchParams.get('district');
     const offerType = searchParams.get('offerType') || 'sale';
     const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const sortBy = searchParams.get('sortBy') || 'newest'; // newest | price_m2_asc | price_asc
     const minPrice = searchParams.get('minPrice');
     const maxPrice = searchParams.get('maxPrice');
     const minSize = searchParams.get('minSize');
@@ -50,7 +51,10 @@ export async function GET(request: NextRequest) {
       .eq('offer_type', offerType)
       .not('lat', 'is', null)
       .not('lng', 'is', null)
-      .order('scraped_at', { ascending: false })
+      .order(
+        sortBy === 'price_m2_asc' ? 'price_per_m2' : sortBy === 'price_asc' ? 'price' : 'scraped_at',
+        { ascending: sortBy !== 'newest' }
+      )
       .limit(limit);
 
     // Optional filters
