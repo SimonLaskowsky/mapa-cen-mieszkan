@@ -87,11 +87,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       };
     });
 
-    return NextResponse.json({
-      city,
-      districts: result || [],
-      updatedAt: stats?.[0]?.date || null,
-    });
+    return NextResponse.json(
+      { city, districts: result || [], updatedAt: stats?.[0]?.date || null },
+      { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' } }
+    );
   } catch (error) {
     console.error('Unexpected error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

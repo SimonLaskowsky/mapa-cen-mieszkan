@@ -22,10 +22,19 @@ interface Listing {
 
 type ListingFilter = 'all' | 'favs' | 'hide-ignored';
 
+interface ListingFilters {
+  minPrice?: number;
+  maxPrice?: number;
+  minSize?: number;
+  maxSize?: number;
+  rooms?: number[];
+}
+
 interface ListingsPanelProps {
   city: string;
   district: string;
   offerType: 'sale' | 'rent';
+  filters?: ListingFilters;
   onListingHover?: (listing: Listing | null) => void;
   onClose: () => void;
   ignoredListings?: Set<string>;
@@ -34,7 +43,7 @@ interface ListingsPanelProps {
   onFavourite?: (id: string) => void;
 }
 
-export default function ListingsPanel({ city, district, offerType, onListingHover, onClose, ignoredListings, favouriteListings, onIgnore, onFavourite }: ListingsPanelProps) {
+export default function ListingsPanel({ city, district, offerType, filters, onListingHover, onClose, ignoredListings, favouriteListings, onIgnore, onFavourite }: ListingsPanelProps) {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +55,13 @@ export default function ListingsPanel({ city, district, offerType, onListingHove
       setError(null);
 
       try {
-        const response = await fetch(`/api/listings?city=${city}&district=${district}&offerType=${offerType}&limit=20`);
+        const params = new URLSearchParams({ city, district, offerType, limit: '20' });
+        if (filters?.minPrice) params.set('minPrice', String(filters.minPrice));
+        if (filters?.maxPrice) params.set('maxPrice', String(filters.maxPrice));
+        if (filters?.minSize) params.set('minSize', String(filters.minSize));
+        if (filters?.maxSize) params.set('maxSize', String(filters.maxSize));
+        if (filters?.rooms?.length) params.set('rooms', filters.rooms.join(','));
+        const response = await fetch(`/api/listings?${params}`);
         if (!response.ok) throw new Error('Failed to fetch');
 
         const data = await response.json();
@@ -60,7 +75,7 @@ export default function ListingsPanel({ city, district, offerType, onListingHove
     };
 
     fetchListings();
-  }, [city, district, offerType]);
+  }, [city, district, offerType, filters]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pl-PL').format(price);

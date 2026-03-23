@@ -241,7 +241,6 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
       coordCounts[key] = (coordCounts[key] || 0) + 1;
     });
 
-    console.log('Listing data', listingsData)
     listingsData.forEach((listing, index) => {
       const priceK = Math.round(listing.price / 1000);
       const priceM2K = (listing.pricePerM2 / 1000).toFixed(1);
@@ -263,7 +262,6 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
       }
 
       const el = document.createElement('div');
-      console.log('Listing thumbnail url:',listing.thumbnailUrl);
       el.className = 'listing-marker';
       el.style.cssText = `
         width: 0;
@@ -1112,7 +1110,6 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
   // Toggle listing markers visibility (respects zoom)
   useEffect(() => {
     const zoom = map.current?.getZoom() ?? 11;
-    console.log('zoom:',zoom);
     const visible = showListings && zoom >= 7;
     listingMarkersRef.current.forEach(marker => {
       marker.getElement().style.display = visible ? 'block' : 'none';

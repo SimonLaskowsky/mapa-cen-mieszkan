@@ -244,7 +244,7 @@ export default function Home() {
         >
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
-            <h2 className="tactical-label">DISCTRICTS PRICE INDEX</h2>
+            <h2 className="tactical-label">DISTRICTS PRICE INDEX</h2>
           </div>
           <span className="font-mono text-xs text-[#00d4aa]">{priceIndexOpen ? '−' : '+'}</span>
         </button>
@@ -625,6 +625,7 @@ export default function Home() {
                     city={citySlug}
                     district={focusedDistrict}
                     offerType={offerType}
+                    filters={listingFilters}
                     onListingHover={(listing) => setHoveredListing(listing ? { id: listing.id, lat: listing.lat, lng: listing.lng } : null)}
                     onClose={() => setFocusedDistrict(null)}
                     ignoredListings={ignoredListings}
