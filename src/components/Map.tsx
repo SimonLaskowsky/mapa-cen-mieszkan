@@ -535,7 +535,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
     map.current.on('moveend', fireBounds);
 
     // Hide district markers when zoomed out too far
-    const DISTRICT_LABEL_MIN_ZOOM = 11.5;
+    const DISTRICT_LABEL_MIN_ZOOM = 10.5;
     const updateMarkerVisibility = () => {
       if (!map.current) return;
       const zoom = map.current.getZoom();

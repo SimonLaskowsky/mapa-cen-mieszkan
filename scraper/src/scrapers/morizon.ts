@@ -9,6 +9,71 @@ import {
   randomDelay,
 } from '../utils/normalize.js';
 
+// Poland bounding box for sanity-checking extracted coordinates
+const POLAND_BOUNDS = { minLat: 49, maxLat: 55, minLng: 14, maxLng: 25 };
+
+export async function fetchListingCoords(url: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'pl-PL,pl;q=0.9',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!response.ok) return null;
+
+    const html = await response.text();
+    const match = html.match(/<script[^>]*id="__NUXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (!match) return null;
+
+    const data: unknown[] = JSON.parse(match[1]);
+
+    // Morizon embeds the listing pin as: {"center": N, "zoom": M}
+    // where data[N] = {"latitude": lat_idx, "longitude": lng_idx}
+    // and data[lat_idx] / data[lng_idx] are the actual floats.
+    for (let i = 0; i < data.length; i++) {
+      const val = data[i];
+      if (
+        val !== null &&
+        typeof val === 'object' &&
+        !Array.isArray(val) &&
+        'center' in val &&
+        'zoom' in val
+      ) {
+        const centerIdx = (val as { center: number }).center;
+        const centerObj = data[centerIdx];
+        if (
+          centerObj !== null &&
+          typeof centerObj === 'object' &&
+          !Array.isArray(centerObj) &&
+          'latitude' in centerObj &&
+          'longitude' in centerObj
+        ) {
+          const latIdx = (centerObj as { latitude: number; longitude: number }).latitude;
+          const lngIdx = (centerObj as { latitude: number; longitude: number }).longitude;
+          const lat = data[latIdx];
+          const lng = data[lngIdx];
+          if (
+            typeof lat === 'number' &&
+            typeof lng === 'number' &&
+            lat > POLAND_BOUNDS.minLat && lat < POLAND_BOUNDS.maxLat &&
+            lng > POLAND_BOUNDS.minLng && lng < POLAND_BOUNDS.maxLng
+          ) {
+            return { lat, lng };
+          }
+        }
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 const DEFAULT_CONFIG: ScraperConfig = {
   city: 'warszawa',
   offerType: 'sale',
@@ -299,12 +364,19 @@ export class MorizonScraper {
       const finalDistrict = district || this.parseLocation(raw.title).district;
       if (!finalDistrict) continue;
 
+      const coords = await fetchListingCoords(raw.url);
+      if (coords) {
+        process.stdout.write(` 📍 ${coords.lat.toFixed(4)},${coords.lng.toFixed(4)}`);
+      }
+
       processed.push({
         externalId: raw.externalId,
         source: 'morizon',
         city: this.config.city,
         district: finalDistrict,
         address: address || undefined,
+        lat: coords?.lat,
+        lng: coords?.lng,
         price,
         sizeM2: size,
         rooms: parseRooms(raw.rooms) || undefined,
@@ -314,6 +386,9 @@ export class MorizonScraper {
         thumbnailUrl: raw.thumbnailUrl || undefined,
         scrapedAt: now,
       });
+
+      // Polite delay between listing page fetches
+      await randomDelay(250, 450);
     }
 
     return processed;
