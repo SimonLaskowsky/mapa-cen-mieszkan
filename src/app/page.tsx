@@ -9,6 +9,7 @@ import CitySelector from '@/components/CitySelector';
 import AddressSearch from '@/components/AddressSearch';
 import CountUp from '@/components/CountUp';
 import { CITIES } from '@/lib/cities';
+import { type DistrictStats } from '@/lib/city-data';
 import { useViewportDistricts, type Bbox } from '@/lib/useViewportDistricts';
 import { useSoundEffects } from '@/lib/useSoundEffects';
 import { useDebounce } from '@/lib/useDebounce';
@@ -212,18 +213,18 @@ export default function Home() {
       ? yieldsWithData.reduce((sum, s) => sum + s.rentalYield!, 0) / yieldsWithData.length
       : 0;
 
-    return { avgPrice, totalListings, avgChange, highest, lowest, districtCount: stats.length, avgYield };
+    const mostActive = stats.reduce((best, s) => s.listingCount > best.listingCount ? s : best, stats[0]);
+
+    return { avgPrice, totalListings, avgChange, highest, lowest, districtCount: stats.length, avgYield, mostActive };
   }, [cityData, offerType]);
 
   const [timeString, setTimeString] = useState<string | null>(null);
-  const [dateString, setDateString] = useState<string | null>(null);
 
   useEffect(() => {
     // Only run on client to avoid hydration mismatch
     const updateTime = () => {
       const now = new Date();
       setTimeString(now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      setDateString(now.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' }));
     };
 
     updateTime(); // Initial update
@@ -443,7 +444,6 @@ export default function Home() {
             {cityData ? (
               <StatsPanel
                 cityData={cityData}
-                citySlug={citySlug}
                 selectedDistrict={focusedDistrict}
                 onDistrictSelect={onDistrictSelect}
               />
@@ -497,30 +497,31 @@ export default function Home() {
               />
           </div>
 
-          {/* Right - Location & Time */}
+          {/* Right - Useful city stats */}
           <div className="hidden sm:flex items-center gap-4 shrink-0">
             <div className="hidden md:flex items-center gap-4">
-              <div className="text-center">
-                <p className="tactical-label">REGION</p>
-                <p className="font-mono text-sm text-white">{cityConfig.name.toUpperCase()}</p>
+              <div className="text-right">
+                <p className="tactical-label">BEST VALUE</p>
+                <p className="font-mono text-sm text-[#22c55e]">
+                  {cityStats.lowest
+                    ? `${cityStats.lowest.district.toUpperCase().replace(/-/g, ' ')} · ${(cityStats.lowest.avgPriceM2 / 1000).toFixed(1)}K`
+                    : '—'}
+                </p>
               </div>
               <div className="h-8 w-px bg-[#00d4aa20]" />
-              <div className="text-center">
-                <p className="tactical-label">COORDINATES</p>
+              <div className="text-right">
+                <p className="tactical-label">MOST ACTIVE</p>
                 <p className="font-mono text-sm text-[#00d4aa]">
-                  {cityConfig.center[1].toFixed(4)}°N {cityConfig.center[0].toFixed(4)}°E
+                  {cityStats.mostActive
+                    ? `${cityStats.mostActive.district.toUpperCase().replace(/-/g, ' ')} · ${cityStats.mostActive.listingCount}`
+                    : '—'}
                 </p>
               </div>
               <div className="h-8 w-px bg-[#00d4aa20]" />
             </div>
             <div className="text-right">
-              <p className="tactical-label">LOCAL TIME</p>
-              <p className="font-mono text-sm text-white">{timeString ?? '--:--:--'}</p>
-            </div>
-            <div className="h-8 w-px bg-[#00d4aa20]" />
-            <div className="text-right">
-              <p className="tactical-label">DATE</p>
-              <p className="font-mono text-sm text-[#00d4aa]">{dateString ?? '--.--.----'}</p>
+              <p className="tactical-label">TIME</p>
+              <p className="font-mono text-sm text-white">{timeString ? timeString.slice(0, 5) : '--:--'}</p>
             </div>
           </div>
         </div>
@@ -534,7 +535,7 @@ export default function Home() {
         </aside>
 
         {/* Map Area */}
-        <div className="flex-1 flex flex-col gap-3">
+        <div className="flex-1 flex flex-col gap-3 min-w-0">
           {/* Map */}
           <div className="flex-1 relative tactical-panel tactical-panel-bottom rounded-lg overflow-hidden">
             <Map
@@ -635,101 +636,211 @@ export default function Home() {
               )}
             </div>
 
-            {/* Listings Slide-Over Panel */}
-            <div
-              className={`absolute top-0 right-0 h-full w-full sm:w-80 z-[40] transition-transform duration-300 ease-in-out ${
-                focusedDistrict && cityData ? 'translate-x-0' : 'translate-x-full'
-              }`}
-            >
-              {focusedDistrict && cityData && (
-                <div className="h-full tactical-panel border-l border-[#00d4aa15]">
-                  <ListingsPanel
-                    city={citySlug}
-                    district={focusedDistrict}
-                    offerType={offerType}
-                    filters={listingFilters}
-                    onListingHover={(listing) => setHoveredListing(listing ? { id: listing.id, lat: listing.lat, lng: listing.lng } : null)}
-                    onClose={() => setFocusedDistrict(null)}
-                    ignoredListings={ignoredListings}
-                    favouriteListings={favouriteListings}
-                    onIgnore={toggleIgnore}
-                    onFavourite={toggleFavourite}
-                  />
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Bottom Stats Bar */}
           <div className="flex-shrink-0 tactical-panel tactical-panel-bottom rounded-lg p-3">
-            <div className="flex flex-wrap items-center justify-between gap-y-2">
-              <div className="flex items-center gap-3 sm:gap-6 flex-wrap">
-                <div>
-                  <p className="tactical-label">{offerType === 'sale' ? 'AVG PRICE / M²' : 'AVG RENT / MONTH'}</p>
-                  <p className="font-mono text-base sm:text-lg text-[#00d4aa] data-glow">
-                    <CountUp value={cityStats.avgPrice} separator=" " /> PLN
-                  </p>
-                </div>
-                <div className="h-8 w-px bg-[#00d4aa20]" />
-                <div>
-                  <p className="tactical-label">ACTIVE LISTINGS</p>
-                  <p className="font-mono text-base sm:text-lg text-white">
-                    <CountUp value={cityStats.totalListings} separator=" " />
-                  </p>
-                </div>
-                <div className="h-8 w-px bg-[#00d4aa20]" />
-                <div>
-                  <p className="tactical-label">30D CHANGE</p>
-                  <p className={`font-mono text-base sm:text-lg ${cityStats.avgChange >= 0 ? 'text-red-400' : 'text-green-400'}`}>
-                    {cityStats.avgChange >= 0 ? '+' : ''}<CountUp value={Math.abs(cityStats.avgChange)} decimals={1} />%
-                  </p>
-                </div>
-                {cityStats.avgYield > 0 && (
-                  <>
-                    <div className="h-8 w-px bg-[#00d4aa20] hidden sm:block" />
-                    <div className="hidden sm:block">
-                      <p className="tactical-label">AVG YIELD</p>
-                      <p className={`font-mono text-base sm:text-lg ${cityStats.avgYield >= 5 ? 'text-green-400' : cityStats.avgYield >= 4 ? 'text-yellow-400' : 'text-orange-400'}`}>
-                        <CountUp value={cityStats.avgYield} decimals={1} />%
+            {(() => {
+              const ds: DistrictStats | undefined = focusedDistrict && cityData
+                ? Object.values(cityData.DISTRICT_STATS).find(d => d.district === focusedDistrict)
+                : undefined;
+
+              if (ds) {
+                const price = offerType === 'rent' ? (ds.avgPrice || 0) : ds.avgPriceM2;
+                const changeColor = ds.change30d >= 0 ? 'text-red-400' : 'text-green-400';
+                const rcnDiff = ds.rcnMedianPriceM2
+                  ? ((ds.medianPriceM2 - ds.rcnMedianPriceM2) / ds.rcnMedianPriceM2 * 100)
+                  : null;
+                return (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center gap-3 sm:gap-5 overflow-x-auto min-w-0">
+                      <div className="shrink-0">
+                        <p className="tactical-label">DISTRICT</p>
+                        <p className="font-mono text-sm sm:text-base text-white font-semibold">{ds.district.toUpperCase().replace(/-/g, ' ')}</p>
+                      </div>
+                      <div className="h-8 w-px bg-[#00d4aa20] shrink-0" />
+                      <div className="shrink-0">
+                        <p className="tactical-label">{offerType === 'sale' ? 'AVG/M²' : 'AVG RENT'}</p>
+                        <p className="font-mono text-sm sm:text-base text-[#00d4aa] data-glow">
+                          <CountUp value={price} separator=" " />
+                        </p>
+                      </div>
+                      <div className="h-8 w-px bg-[#00d4aa20] shrink-0" />
+                      <div className="shrink-0">
+                        <p className="tactical-label">MEDIAN</p>
+                        <p className="font-mono text-sm sm:text-base text-white">
+                          <CountUp value={ds.medianPriceM2} separator=" " />
+                        </p>
+                      </div>
+                      <div className="h-8 w-px bg-[#00d4aa20] shrink-0" />
+                      <div className="shrink-0">
+                        <p className="tactical-label">30D</p>
+                        <p className={`font-mono text-sm sm:text-base ${changeColor}`}>
+                          {ds.change30d >= 0 ? '+' : ''}<CountUp value={Math.abs(ds.change30d)} decimals={1} />%
+                        </p>
+                      </div>
+                      <div className="h-8 w-px bg-[#00d4aa20] shrink-0" />
+                      <div className="shrink-0">
+                        <p className="tactical-label">LISTINGS</p>
+                        <p className="font-mono text-sm sm:text-base text-white">
+                          <CountUp value={ds.listingCount} separator=" " />
+                        </p>
+                      </div>
+                      {ds.avgSize > 0 && (
+                        <>
+                          <div className="h-8 w-px bg-[#00d4aa20] shrink-0 hidden md:block" />
+                          <div className="shrink-0 hidden md:block">
+                            <p className="tactical-label">SIZE</p>
+                            <p className="font-mono text-sm sm:text-base text-white">{ds.avgSize} m²</p>
+                          </div>
+                        </>
+                      )}
+                      {ds.rentalYield != null && ds.rentalYield > 0 && (
+                        <>
+                          <div className="h-8 w-px bg-[#00d4aa20] shrink-0 hidden md:block" />
+                          <div className="shrink-0 hidden md:block">
+                            <p className="tactical-label">YIELD</p>
+                            <p className={`font-mono text-sm sm:text-base ${ds.rentalYield >= 5 ? 'text-green-400' : ds.rentalYield >= 4 ? 'text-yellow-400' : 'text-orange-400'}`}>
+                              <CountUp value={ds.rentalYield} decimals={1} />%
+                            </p>
+                          </div>
+                        </>
+                      )}
+                      {rcnDiff !== null && ds.rcnMedianPriceM2 && offerType === 'sale' && (
+                        <>
+                          <div className="h-8 w-px bg-[#00d4aa20] shrink-0 hidden xl:block" />
+                          <div className="shrink-0 hidden xl:block">
+                            <p className="tactical-label text-purple-400">TXN</p>
+                            <p className="font-mono text-sm sm:text-base text-purple-400">
+                              <CountUp value={ds.rcnMedianPriceM2} separator=" " />
+                            </p>
+                          </div>
+                          <div className="shrink-0 hidden xl:block">
+                            <p className="tactical-label">vs TXN</p>
+                            <p className={`font-mono text-sm sm:text-base ${rcnDiff > 0 ? 'text-orange-400' : 'text-green-400'}`}>
+                              {rcnDiff > 0 ? '+' : ''}{rcnDiff.toFixed(1)}%
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setFocusedDistrict(null)}
+                      className="text-gray-500 hover:text-white transition-colors p-1 shrink-0"
+                      title="Clear selection"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="flex flex-wrap items-center justify-between gap-y-2">
+                  <div className="flex items-center gap-3 sm:gap-6 flex-wrap">
+                    <div>
+                      <p className="tactical-label">{offerType === 'sale' ? 'AVG PRICE / M²' : 'AVG RENT / MONTH'}</p>
+                      <p className="font-mono text-base sm:text-lg text-[#00d4aa] data-glow">
+                        <CountUp value={cityStats.avgPrice} separator=" " /> PLN
                       </p>
                     </div>
-                  </>
-                )}
-              </div>
-
-              <div className="hidden lg:flex items-center gap-6">
-                <div>
-                  <p className="tactical-label">HIGHEST</p>
-                  <p className="font-mono text-sm">
-                    {cityStats.highest ? (
+                    <div className="h-8 w-px bg-[#00d4aa20]" />
+                    <div>
+                      <p className="tactical-label">ACTIVE LISTINGS</p>
+                      <p className="font-mono text-base sm:text-lg text-white">
+                        <CountUp value={cityStats.totalListings} separator=" " />
+                      </p>
+                    </div>
+                    <div className="h-8 w-px bg-[#00d4aa20]" />
+                    <div>
+                      <p className="tactical-label">30D CHANGE</p>
+                      <p className={`font-mono text-base sm:text-lg ${cityStats.avgChange >= 0 ? 'text-red-400' : 'text-green-400'}`}>
+                        {cityStats.avgChange >= 0 ? '+' : ''}<CountUp value={Math.abs(cityStats.avgChange)} decimals={1} />%
+                      </p>
+                    </div>
+                    {cityStats.avgYield > 0 && (
                       <>
-                        <span className="text-red-400">{(offerType === 'rent' ? (cityStats.highest.avgPrice || 0) : cityStats.highest.avgPriceM2).toLocaleString('pl-PL')}</span>
-                        <span className="text-gray-500"> {cityStats.highest.district.toUpperCase()}</span>
+                        <div className="h-8 w-px bg-[#00d4aa20] hidden sm:block" />
+                        <div className="hidden sm:block">
+                          <p className="tactical-label">AVG YIELD</p>
+                          <p className={`font-mono text-base sm:text-lg ${cityStats.avgYield >= 5 ? 'text-green-400' : cityStats.avgYield >= 4 ? 'text-yellow-400' : 'text-orange-400'}`}>
+                            <CountUp value={cityStats.avgYield} decimals={1} />%
+                          </p>
+                        </div>
                       </>
-                    ) : (
-                      <span className="text-gray-500">--</span>
                     )}
-                  </p>
+                  </div>
+                  <div className="hidden lg:flex items-center gap-6">
+                    <div>
+                      <p className="tactical-label">HIGHEST</p>
+                      <p className="font-mono text-sm">
+                        {cityStats.highest ? (
+                          <>
+                            <span className="text-red-400">{(offerType === 'rent' ? (cityStats.highest.avgPrice || 0) : cityStats.highest.avgPriceM2).toLocaleString('pl-PL')}</span>
+                            <span className="text-gray-500"> {cityStats.highest.district.toUpperCase()}</span>
+                          </>
+                        ) : <span className="text-gray-500">--</span>}
+                      </p>
+                    </div>
+                    <div className="h-8 w-px bg-[#00d4aa20]" />
+                    <div>
+                      <p className="tactical-label">LOWEST</p>
+                      <p className="font-mono text-sm">
+                        {cityStats.lowest ? (
+                          <>
+                            <span className="text-green-400">{(offerType === 'rent' ? (cityStats.lowest.avgPrice || 0) : cityStats.lowest.avgPriceM2).toLocaleString('pl-PL')}</span>
+                            <span className="text-gray-500"> {cityStats.lowest.district.toUpperCase()}</span>
+                          </>
+                        ) : <span className="text-gray-500">--</span>}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="h-8 w-px bg-[#00d4aa20]" />
-                <div>
-                  <p className="tactical-label">LOWEST</p>
-                  <p className="font-mono text-sm">
-                    {cityStats.lowest ? (
-                      <>
-                        <span className="text-green-400">{(offerType === 'rent' ? (cityStats.lowest.avgPrice || 0) : cityStats.lowest.avgPriceM2).toLocaleString('pl-PL')}</span>
-                        <span className="text-gray-500"> {cityStats.lowest.district.toUpperCase()}</span>
-                      </>
-                    ) : (
-                      <span className="text-gray-500">--</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         </div>
+
+        {/* Right Sidebar - District Listings (desktop) */}
+        <aside className={`hidden md:block shrink-0 overflow-hidden transition-all duration-300 ease-in-out ${focusedDistrict && cityData ? 'w-80' : 'w-0'}`}>
+          {focusedDistrict && cityData && (
+            <div className="w-80 h-full tactical-panel rounded-lg overflow-hidden">
+              <ListingsPanel
+                city={citySlug}
+                district={focusedDistrict}
+                offerType={offerType}
+                filters={listingFilters}
+                onListingHover={(listing) => setHoveredListing(listing ? { id: listing.id, lat: listing.lat, lng: listing.lng } : null)}
+                onClose={() => setFocusedDistrict(null)}
+                ignoredListings={ignoredListings}
+                favouriteListings={favouriteListings}
+                onIgnore={toggleIgnore}
+                onFavourite={toggleFavourite}
+              />
+            </div>
+          )}
+        </aside>
       </div>
+
+      {/* Mobile Listings Overlay */}
+      {focusedDistrict && cityData && (
+        <div className="md:hidden fixed inset-0 z-60 bg-[#05080a]">
+          <ListingsPanel
+            city={citySlug}
+            district={focusedDistrict}
+            offerType={offerType}
+            filters={listingFilters}
+            onListingHover={(listing) => setHoveredListing(listing ? { id: listing.id, lat: listing.lat, lng: listing.lng } : null)}
+            onClose={() => setFocusedDistrict(null)}
+            ignoredListings={ignoredListings}
+            favouriteListings={favouriteListings}
+            onIgnore={toggleIgnore}
+            onFavourite={toggleFavourite}
+          />
+        </div>
+      )}
 
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (

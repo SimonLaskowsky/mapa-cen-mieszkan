@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import TrendChart from './TrendChart';
 
 interface Listing {
   id: string;
@@ -50,6 +51,7 @@ export default function ListingsPanel({ city, district, offerType, filters, onLi
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ListingFilter>('all');
   const [sortBy, setSortBy] = useState<SortBy>('price_m2_asc');
+  const [chartOpen, setChartOpen] = useState(false);
 
   useEffect(() => {
     const fetchListings = async () => {
@@ -136,6 +138,18 @@ export default function ListingsPanel({ city, district, offerType, filters, onLi
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
+      </div>
+
+      {/* Trend Chart */}
+      <div className="border-b border-[#00d4aa15] flex-shrink-0">
+        <button
+          onClick={() => setChartOpen(o => !o)}
+          className="w-full px-3 py-1.5 flex items-center justify-between hover:bg-[#00d4aa08] transition-colors"
+        >
+          <span className="tactical-label">PRICE TREND</span>
+          <span className="font-mono text-xs text-[#00d4aa]">{chartOpen ? '−' : '+'}</span>
+        </button>
+        {chartOpen && <TrendChart city={city} district={district} offerType={offerType} />}
       </div>
 
       {/* Sort Bar */}

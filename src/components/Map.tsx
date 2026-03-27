@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { CITIES, CITY_ORDER } from '@/lib/cities';
-import { formatPrice, formatPercent, type DistrictStats, type CityData } from '@/lib/city-data';
+import { type DistrictStats, type CityData } from '@/lib/city-data';
 import { useSoundEffects } from '@/lib/useSoundEffects';
 
 interface Listing {
@@ -116,52 +116,10 @@ function getPriceBars(tier: number): string {
   return '█'.repeat(filled) + '░'.repeat(empty);
 }
 
-function buildRcnSection(stats: DistrictStats, offerType: string): string {
-  if (offerType !== 'sale' || !stats.rcnMedianPriceM2) return '';
-  const offerDiff = (stats.medianPriceM2 - stats.rcnMedianPriceM2) / stats.rcnMedianPriceM2 * 100;
-  const diffColor = offerDiff > 0 ? '#f97316' : '#22c55e';
-  const sign = offerDiff > 0 ? '+' : '';
-  const monthStr = stats.rcnMonth ? stats.rcnMonth.slice(0, 7) : '';
-  return `<div style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 8px; padding-top: 8px; display: grid; gap: 6px;">
-              <div style="font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.08em;">TRANSACTION PRICES (RCN)</div>
-              <div style="display: flex; justify-content: space-between; gap: 4px;">
-                <span style="color: rgba(255,255,255,0.5);">MEDIAN TRANSACTED/M²</span>
-                <span style="color: #a78bfa; font-weight: 600;">${formatPrice(stats.rcnMedianPriceM2)}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; gap: 4px;">
-                <span style="color: rgba(255,255,255,0.5);">OFFER vs ACTUAL</span>
-                <span style="color: ${diffColor};">${sign}${offerDiff.toFixed(1)}% ${offerDiff > 0 ? 'above' : 'below'}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; gap: 4px;">
-                <span style="color: rgba(255,255,255,0.5);">TRANSACTIONS</span>
-                <span style="color: white;">${stats.rcnTransactionCount ?? '—'}</span>
-              </div>
-              ${monthStr ? `<div style="color: rgba(255,255,255,0.25); font-size: 10px; text-align: right;">data: ${monthStr}</div>` : ''}
-            </div>`;
-}
-
-function getPriceThreatLevel(price: number, offerType: 'sale' | 'rent' = 'sale'): { label: string; color: string } {
-  if (offerType === 'rent') {
-    if (price < 2500) return { label: 'LOW', color: '#22c55e' };
-    if (price < 3500) return { label: 'MODERATE', color: '#84cc16' };
-    if (price < 4500) return { label: 'ELEVATED', color: '#eab308' };
-    if (price < 5500) return { label: 'HIGH', color: '#f97316' };
-    if (price < 7000) return { label: 'SEVERE', color: '#ef4444' };
-    return { label: 'CRITICAL', color: '#dc2626' };
-  } else {
-    if (price < 12000) return { label: 'LOW', color: '#22c55e' };
-    if (price < 14000) return { label: 'MODERATE', color: '#84cc16' };
-    if (price < 16000) return { label: 'ELEVATED', color: '#eab308' };
-    if (price < 18000) return { label: 'HIGH', color: '#f97316' };
-    if (price < 22000) return { label: 'SEVERE', color: '#ef4444' };
-    return { label: 'CRITICAL', color: '#dc2626' };
-  }
-}
 
 export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChange, onDistrictSelect, searchLocation, focusedDistrict, onDistrictClick, showListings = true, showDistrictLabels = true, showHeatmap = true, showDistrictFill = true, listingFilters, hoveredListingId, ignoredListings, favouriteListings, flyToCity }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const popup = useRef<maplibregl.Popup | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const listingMarkersRef = useRef<maplibregl.Marker[]>([]);
   const listingMarkerElementsRef = useRef<Record<string, HTMLElement>>({});
@@ -414,18 +372,22 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
       el.innerHTML = `
         <div class="district-marker-content" style="--tier-color: ${color};">
           <div class="marker-name">${displayName}</div>
-          <div class="marker-bars" style="color: ${color};">${bars}</div>
           <div class="marker-price" style="color: ${color};">${(displayPrice / 1000).toFixed(1)}k</div>
-          ${rangeHtml}
-          <div class="marker-meta">
-            <span class="marker-listings">${stats.listingCount}</span>
-            <span class="marker-change" style="color: ${changeColor};">${changeIcon}${Math.abs(stats.change30d).toFixed(1)}%</span>
+          <div class="marker-detail">
+            <div class="marker-bars" style="color: ${color};">${bars}</div>
+            ${rangeHtml}
+            <div class="marker-meta">
+              <span class="marker-listings">${stats.listingCount}</span>
+              <span class="marker-change" style="color: ${changeColor};">${changeIcon}${Math.abs(stats.change30d).toFixed(1)}%</span>
+            </div>
           </div>
         </div>
       `;
 
       const zoom = mapInstance.getZoom();
-      el.style.display = (showDistrictLabelsRef.current && zoom >= 11.5) ? 'block' : 'none';
+      const visible = showDistrictLabelsRef.current && zoom >= 9;
+      el.style.display = visible ? 'block' : 'none';
+      if (zoom < 10.5) el.classList.add('district-marker--compact');
 
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([district.lng, district.lat])
@@ -512,13 +474,6 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
 
     map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
 
-    popup.current = new maplibregl.Popup({
-      closeButton: true,
-      closeOnClick: false,
-      maxWidth: '320px',
-      offset: 25,
-    });
-
     // Fire bounds on moveend
     const fireBounds = () => {
       if (!map.current) return;
@@ -533,15 +488,19 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
     map.current.on('moveend', fireBounds);
 
     // Hide district markers when zoomed out too far
-    const DISTRICT_LABEL_MIN_ZOOM = 10.5;
+    const DISTRICT_LABEL_MIN_ZOOM = 9;
+    const DISTRICT_DETAIL_ZOOM = 10.5;
     const updateMarkerVisibility = () => {
       if (!map.current) return;
       const zoom = map.current.getZoom();
       const visible = zoom >= DISTRICT_LABEL_MIN_ZOOM && showDistrictLabelsRef.current;
+      const compact = zoom < DISTRICT_DETAIL_ZOOM;
       markersRef.current.forEach(marker => {
-        marker.getElement().style.display = visible ? 'block' : 'none';
+        const el = marker.getElement();
+        el.style.display = visible ? 'block' : 'none';
+        el.classList.toggle('district-marker--compact', compact);
       });
-      const listingsVisible = zoom >= DISTRICT_LABEL_MIN_ZOOM && showListingsRef.current;
+      const listingsVisible = zoom >= DISTRICT_DETAIL_ZOOM && showListingsRef.current;
       listingMarkersRef.current.forEach(marker => {
         marker.getElement().style.display = listingsVisible ? 'block' : 'none';
       });
@@ -744,6 +703,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
             { hover: true }
           );
         }
+
       });
 
       map.current.on('mouseleave', 'district-fill', () => {
@@ -760,71 +720,16 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
         hoveredId = null;
       });
 
-      // Click handler
+      // Click handler — right panel handles the details, just trigger selection
       map.current.on('click', 'district-fill', (e) => {
-        if (!map.current || !popup.current || !e.features?.[0]) return;
+        if (!map.current || !e.features?.[0]) return;
         playSoundRef.current('pop');
 
-        const feature = e.features[0];
-        const name = feature.properties?.name;
-        const currentData = cityDataRef.current;
-        const districtData = currentData.DISTRICT_CENTERS.find(d => d.name === name);
-
+        const name = e.features[0].properties?.name;
+        const districtData = cityDataRef.current.DISTRICT_CENTERS.find(d => d.name === name);
         if (!districtData) return;
 
-        const stats = districtData.stats;
-        const coordinates = e.lngLat;
-        const currentOfferType = offerTypeRef.current;
-        const popupDisplayPrice = currentOfferType === 'rent' ? (stats.avgPrice || 0) : stats.avgPriceM2;
-        const tier = getPriceTier(popupDisplayPrice, currentOfferType);
-        const tierColor = getTierColor(tier);
-        const displayName = districtData.displayName || districtData.name;
-
-        const changeColor = stats.change30d >= 0 ? '#ef4444' : '#22c55e';
-        const changeIcon = stats.change30d >= 0 ? '▲' : '▼';
-        const threatLevel = getPriceThreatLevel(popupDisplayPrice, currentOfferType);
-
-        const priceLabel = currentOfferType === 'rent' ? 'AVG RENT/MONTH' : 'AVG PRICE/M²';
-        const medianLabel = currentOfferType === 'rent' ? 'MEDIAN RENT' : 'MEDIAN/M²';
-
-        const html = `
-          <div style="font-family: ui-monospace, monospace;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-              <span style="font-size: 14px; font-weight: 600; color: white;">${displayName.toUpperCase()}</span>
-              <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${tierColor}20; color: ${tierColor}; border: 1px solid ${tierColor}40;">${threatLevel.label}</span>
-            </div>
-            <div style="display: grid; gap: 8px; font-size: 12px;">
-              <div style="display: flex; justify-content: space-between; gap: 4px;">
-                <span style="color: rgba(255,255,255,0.5);">${priceLabel}</span>
-                <span style="color: ${tierColor}; font-weight: 600;">${formatPrice(popupDisplayPrice)}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; gap: 4px;">
-                <span style="color: rgba(255,255,255,0.5);">${medianLabel}</span>
-                <span style="color: white;">${formatPrice(currentOfferType === 'rent' ? (stats.medianPriceM2 * (stats.avgSize || 50)) : stats.medianPriceM2)}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; gap: 4px;">
-                <span style="color: rgba(255,255,255,0.5);">30D CHANGE</span>
-                <span style="color: ${changeColor};">${changeIcon} ${formatPercent(stats.change30d)}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; gap: 4px;">
-                <span style="color: rgba(255,255,255,0.5);">LISTINGS</span>
-                <span style="color: white;">${stats.listingCount}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; gap: 4px;">
-                <span style="color: rgba(255,255,255,0.5);">AVG SIZE</span>
-                <span style="color: white;">${stats.avgSize} m²</span>
-              </div>
-              ${stats.rentalYield ? `<div style="display: flex; justify-content: space-between; gap: 4px;">
-                <span style="color: rgba(255,255,255,0.5);">GROSS YIELD</span>
-                <span style="color: ${stats.rentalYield >= 5 ? '#22c55e' : stats.rentalYield >= 4 ? '#eab308' : '#ef4444'}; font-weight: 600;">${stats.rentalYield.toFixed(1)}%</span>
-              </div>` : ''}
-              ${buildRcnSection(stats, currentOfferType)}
-            </div>
-          </div>
-        `;
-
-        popup.current.setLngLat(coordinates).setHTML(html).addTo(map.current);
-        onDistrictSelect?.(stats);
+        onDistrictSelect?.(districtData.stats);
         onDistrictClickRef.current?.(name);
       });
     });
@@ -832,7 +737,6 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
     return () => {
       clearMarkers();
       clearListingMarkers();
-      if (popup.current) popup.current.remove();
       if (map.current) map.current.remove();
       map.current = null;
     };
@@ -905,81 +809,20 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
     }
   }, [searchLocation]);
 
-  // Handle focused district from panel click
+  // Handle focused district from panel click — fly to it, details shown in right panel
   useEffect(() => {
-    if (!map.current || !popup.current || !focusedDistrict) return;
+    if (!map.current || !focusedDistrict) return;
 
-    const currentData = cityDataRef.current;
-    const districtData = currentData.DISTRICT_CENTERS.find(d => d.name === focusedDistrict);
-
+    const districtData = cityDataRef.current.DISTRICT_CENTERS.find(d => d.name === focusedDistrict);
     if (!districtData) return;
 
-    const stats = districtData.stats;
-    const coordinates: [number, number] = [districtData.lng, districtData.lat];
-    const currentOfferType = offerTypeRef.current;
-    const popupDisplayPrice = currentOfferType === 'rent' ? (stats.avgPrice || 0) : stats.avgPriceM2;
-    const tier = getPriceTier(popupDisplayPrice, currentOfferType);
-    const tierColor = getTierColor(tier);
-    const displayName = districtData.displayName || districtData.name;
-
-    const changeColor = stats.change30d >= 0 ? '#ef4444' : '#22c55e';
-    const changeIcon = stats.change30d >= 0 ? '▲' : '▼';
-    const threatLevel = getPriceThreatLevel(popupDisplayPrice, currentOfferType);
-
-    const priceLabel = currentOfferType === 'rent' ? 'AVG RENT/MONTH' : 'AVG PRICE/M²';
-    const medianLabel = currentOfferType === 'rent' ? 'MEDIAN RENT' : 'MEDIAN/M²';
-
-    const html = `
-      <div style="font-family: ui-monospace, monospace;">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-          <span style="font-size: 14px; font-weight: 600; color: white;">${displayName.toUpperCase()}</span>
-          <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${tierColor}20; color: ${tierColor}; border: 1px solid ${tierColor}40;">${threatLevel.label}</span>
-        </div>
-        <div style="display: grid; gap: 8px; font-size: 12px;">
-          <div style="display: flex; justify-content: space-between; gap: 4px;">
-            <span style="color: rgba(255,255,255,0.5);">${priceLabel}</span>
-            <span style="color: ${tierColor}; font-weight: 600;">${formatPrice(popupDisplayPrice)}</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; gap: 4px;">
-            <span style="color: rgba(255,255,255,0.5);">${medianLabel}</span>
-            <span style="color: white;">${formatPrice(currentOfferType === 'rent' ? (stats.medianPriceM2 * (stats.avgSize || 50)) : stats.medianPriceM2)}</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; gap: 4px;">
-            <span style="color: rgba(255,255,255,0.5);">30D CHANGE</span>
-            <span style="color: ${changeColor};">${changeIcon} ${formatPercent(stats.change30d)}</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; gap: 4px;">
-            <span style="color: rgba(255,255,255,0.5);">LISTINGS</span>
-            <span style="color: white;">${stats.listingCount}</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; gap: 4px;">
-            <span style="color: rgba(255,255,255,0.5);">AVG SIZE</span>
-            <span style="color: white;">${stats.avgSize} m²</span>
-          </div>
-          ${stats.rentalYield ? `<div style="display: flex; justify-content: space-between; gap: 4px;">
-            <span style="color: rgba(255,255,255,0.5);">GROSS YIELD</span>
-            <span style="color: ${stats.rentalYield >= 5 ? '#22c55e' : stats.rentalYield >= 4 ? '#eab308' : '#ef4444'}; font-weight: 600;">${stats.rentalYield.toFixed(1)}%</span>
-          </div>` : ''}
-          ${buildRcnSection(stats, currentOfferType)}
-        </div>
-      </div>
-    `;
-
-    // Fly to district
     map.current.flyTo({
-      center: coordinates,
+      center: [districtData.lng, districtData.lat],
       zoom: 13,
       duration: 1000,
     });
 
-    // Show popup after fly animation
-    setTimeout(() => {
-      if (map.current && popup.current) {
-        popup.current.setLngLat(coordinates).setHTML(html).addTo(map.current);
-      }
-    }, 500);
-
-    onDistrictSelect?.(stats);
+    onDistrictSelect?.(districtData.stats);
   }, [focusedDistrict, onDistrictSelect]);
 
   // Fetch and display listing markers + heatmap when district is selected
@@ -1101,16 +944,19 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
   // Toggle district labels visibility (respects zoom)
   useEffect(() => {
     const zoom = map.current?.getZoom() ?? 11;
-    const visible = showDistrictLabels && zoom >= 11.5;
+    const visible = showDistrictLabels && zoom >= 9;
+    const compact = zoom < 10.5;
     markersRef.current.forEach(marker => {
-      marker.getElement().style.display = visible ? 'block' : 'none';
+      const el = marker.getElement();
+      el.style.display = visible ? 'block' : 'none';
+      el.classList.toggle('district-marker--compact', compact);
     });
   }, [showDistrictLabels]);
 
   // Toggle listing markers visibility (respects zoom)
   useEffect(() => {
     const zoom = map.current?.getZoom() ?? 11;
-    const visible = showListings && zoom >= 7;
+    const visible = showListings && zoom >= 10.5;
     listingMarkersRef.current.forEach(marker => {
       marker.getElement().style.display = visible ? 'block' : 'none';
     });

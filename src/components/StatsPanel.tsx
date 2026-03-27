@@ -1,18 +1,16 @@
 'use client';
 
 import { formatPercent, type CityData, type DistrictStats } from '@/lib/city-data';
-import TrendChart from './TrendChart';
 import CountUp from './CountUp';
 import { useSoundEffects } from '@/lib/useSoundEffects';
 
 interface StatsPanelProps {
   cityData: CityData;
-  citySlug: string;
   selectedDistrict: string | null;
   onDistrictSelect: (district: string | null) => void;
 }
 
-export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDistrictSelect }: StatsPanelProps) {
+export default function StatsPanel({ cityData, selectedDistrict, onDistrictSelect }: StatsPanelProps) {
   const { playSound } = useSoundEffects();
 
   const handleDistrictClick = (districtName: string) => {
@@ -84,22 +82,11 @@ export default function StatsPanel({ cityData, citySlug, selectedDistrict, onDis
         })}
       </div>
 
-      {/* Trend Chart */}
-      {selectedDistrict && (
-        <div className="pt-3 mt-3 border-t border-[#00d4aa15]">
-          <TrendChart
-            city={citySlug}
-            district={selectedDistrict}
-            onClose={() => onDistrictSelect(null)}
-          />
-        </div>
-      )}
-
       {/* Footer */}
       <div className="pt-2 mt-2 border-t border-[#00d4aa10]">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] text-gray-600">
-            <CountUp value={sortedDistricts.length} duration={500} /> TARGETS
+            <CountUp value={sortedDistricts.length} duration={500} /> DISTRICTS
           </span>
           <span className="font-mono text-[10px] text-gray-600">
             <CountUp value={sortedDistricts.reduce((sum, d) => sum + d.listingCount, 0)} separator=" " /> LISTINGS

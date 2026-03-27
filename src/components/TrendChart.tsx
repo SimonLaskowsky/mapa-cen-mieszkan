@@ -12,10 +12,11 @@ interface HistoryPoint {
 interface TrendChartProps {
   city: string;
   district: string;
+  offerType?: 'sale' | 'rent';
   onClose?: () => void;
 }
 
-export default function TrendChart({ city, district, onClose }: TrendChartProps) {
+export default function TrendChart({ city, district, offerType = 'sale', onClose }: TrendChartProps) {
   const [data, setData] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +28,7 @@ export default function TrendChart({ city, district, onClose }: TrendChartProps)
       setError(null);
 
       try {
-        const response = await fetch(`/api/cities/${city}/districts/${district}/history?months=6`);
+        const response = await fetch(`/api/cities/${city}/districts/${district}/history?months=6&offerType=${offerType}`);
         if (!response.ok) throw new Error('Failed to fetch');
 
         const json = await response.json();
@@ -42,7 +43,7 @@ export default function TrendChart({ city, district, onClose }: TrendChartProps)
     };
 
     fetchHistory();
-  }, [city, district]);
+  }, [city, district, offerType]);
 
   if (loading) {
     return (
