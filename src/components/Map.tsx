@@ -18,6 +18,13 @@ interface Listing {
   address: string | null;
   url: string;
   thumbnailUrl: string | null;
+  description: string | null;
+  floor: number | null;
+  buildingYear: number | null;
+  buildingType: string | null;
+  heating: string | null;
+  finishCondition: string | null;
+  photos: string[] | null;
 }
 
 // Map frontend city IDs to API slugs
@@ -63,6 +70,7 @@ interface MapProps {
   ignoredListings?: Set<string>;
   favouriteListings?: Set<string>;
   flyToCity?: string | null;
+  onListingClick?: (listing: Listing) => void;
 }
 
 // Get price tier (1-6) for color coding based on offer type
@@ -102,10 +110,10 @@ function getTierColor(tier: number): string {
 // Get color for a listing based on its price relative to district average
 function getPriceRatioColor(pricePerM2: number, avgPriceM2: number): string {
   const ratio = pricePerM2 / avgPriceM2;
-  if (ratio <= 0.7) return '#22c55e';
-  if (ratio <= 0.85) return '#84cc16';
-  if (ratio <= 1.0) return '#eab308';
-  if (ratio <= 1.15) return '#f97316';
+  if (ratio <= 0.7) return '#3b82f6';
+  if (ratio <= 0.85) return '#06b6d4';
+  if (ratio <= 1.0) return '#a3a3a3';
+  if (ratio <= 1.15) return '#f59e0b';
   return '#ef4444';
 }
 
@@ -117,7 +125,7 @@ function getPriceBars(tier: number): string {
 }
 
 
-export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChange, onDistrictSelect, searchLocation, focusedDistrict, onDistrictClick, showListings = true, showDistrictLabels = true, showHeatmap = true, showDistrictFill = true, listingFilters, hoveredListingId, ignoredListings, favouriteListings, flyToCity }: MapProps) {
+export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChange, onDistrictSelect, searchLocation, focusedDistrict, onDistrictClick, showListings = true, showDistrictLabels = true, showHeatmap = true, showDistrictFill = true, listingFilters, hoveredListingId, ignoredListings, favouriteListings, flyToCity, onListingClick }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
@@ -135,6 +143,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
   const playSoundRef = useRef(playSound);
   const ignoredListingsRef = useRef(ignoredListings);
   const favouriteListingsRef = useRef(favouriteListings);
+  const onListingClickRef = useRef(onListingClick);
 
   // Get current city config
   const cityConfig = CITIES[cityId] || CITIES['warsaw'];
@@ -153,6 +162,10 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
   useEffect(() => {
     favouriteListingsRef.current = favouriteListings;
   }, [favouriteListings]);
+
+  useEffect(() => {
+    onListingClickRef.current = onListingClick;
+  }, [onListingClick]);
 
   useEffect(() => {
     onDistrictClickRef.current = onDistrictClick;
@@ -237,7 +250,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
           background: ${pulseColor};
           border: 2px solid #05080a;
           transform: rotate(45deg);
-          box-shadow: 0 0 8px rgba(0,212,170,0.6);
+          box-shadow: 0 0 8px rgba(59,130,246,0.6);
           transition: all 0.2s ease;
           transform-origin: center;
         "></div>
@@ -247,7 +260,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
           left: -12px;
           width: 24px;
           height: 24px;
-          border: 1px solid rgba(0,212,170,0.4);
+          border: 1px solid rgba(59,130,246,0.4);
           border-radius: 50%;
           animation: listing-pulse 2s ease-out infinite;
           pointer-events: none;
@@ -258,7 +271,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
           left: 0;
           transform: translateX(-50%);
           background: rgba(5,8,10,0.95);
-          border: 1px solid rgba(0,212,170,0.5);
+          border: 1px solid rgba(59,130,246,0.5);
           border-radius: 4px;
           padding: 6px;
           font-family: ui-monospace, monospace;
@@ -292,7 +305,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
         if (tooltip) tooltip.style.opacity = '1';
         if (dot) {
           dot.style.transform = 'rotate(45deg) scale(1.5)';
-          dot.style.boxShadow = '0 0 15px rgba(0,212,170,0.9)';
+          dot.style.boxShadow = '0 0 15px rgba(59,130,246,0.9)';
         }
       });
       el.addEventListener('mouseleave', () => {
@@ -301,19 +314,23 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
         if (tooltip) tooltip.style.opacity = '0';
         if (dot) {
           dot.style.transform = 'rotate(45deg) scale(1)';
-          dot.style.boxShadow = '0 0 8px rgba(0,212,170,0.6)';
+          dot.style.boxShadow = '0 0 8px rgba(59,130,246,0.6)';
         }
       });
 
-      // Click opens listing URL in background tab
+      // Click opens listing detail panel (or falls back to URL)
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         playSound('ping');
-        const a = document.createElement('a');
-        a.href = listing.url;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.click();
+        if (onListingClickRef.current) {
+          onListingClickRef.current(listing);
+        } else {
+          const a = document.createElement('a');
+          a.href = listing.url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.click();
+        }
       });
 
       const currentZoom = mapInstance.getZoom();
@@ -998,7 +1015,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
       if (isIgnored) {
         el.style.filter = 'grayscale(1)';
         dot.style.border = '2px solid #05080a';
-        dot.style.boxShadow = '0 0 8px rgba(0,212,170,0.6)';
+        dot.style.boxShadow = '0 0 8px rgba(59,130,246,0.6)';
         dot.style.transform = 'rotate(45deg) scale(1)';
         if (pulse) pulse.style.display = 'none';
       } else if (isFavourite) {
@@ -1010,7 +1027,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
       } else {
         el.style.filter = 'none';
         dot.style.border = '2px solid #05080a';
-        dot.style.boxShadow = '0 0 8px rgba(0,212,170,0.6)';
+        dot.style.boxShadow = '0 0 8px rgba(59,130,246,0.6)';
         dot.style.transform = 'rotate(45deg) scale(1)';
         if (pulse) pulse.style.display = 'block';
       }
@@ -1029,13 +1046,13 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
 
       if (isIgnored) {
         dot.style.transform = 'rotate(45deg) scale(1)';
-        dot.style.boxShadow = '0 0 8px rgba(0,212,170,0.6)';
+        dot.style.boxShadow = '0 0 8px rgba(59,130,246,0.6)';
       } else if (isFavourite) {
         dot.style.transform = 'rotate(45deg) scale(1.2)';
         dot.style.boxShadow = '0 0 12px rgba(234,179,8,0.7)';
       } else {
         dot.style.transform = 'rotate(45deg) scale(1)';
-        dot.style.boxShadow = '0 0 8px rgba(0,212,170,0.6)';
+        dot.style.boxShadow = '0 0 8px rgba(59,130,246,0.6)';
       }
       el.style.zIndex = '';
     });
@@ -1046,7 +1063,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
       const dot = el.querySelector('.listing-marker-dot') as HTMLElement;
       if (dot) {
         dot.style.transform = 'rotate(45deg) scale(1.5)';
-        dot.style.boxShadow = '0 0 20px rgba(0,212,170,1)';
+        dot.style.boxShadow = '0 0 20px rgba(59,130,246,1)';
       }
       el.style.zIndex = '50';
     }

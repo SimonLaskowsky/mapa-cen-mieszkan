@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import TrendChart from './TrendChart';
-
 interface Listing {
   id: string;
   externalId: string;
@@ -48,18 +46,26 @@ interface ListingsPanelProps {
 export default function ListingsPanel({ city, district, offerType, filters, onListingHover, onClose, ignoredListings, favouriteListings, onIgnore, onFavourite }: ListingsPanelProps) {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ListingFilter>('all');
   const [sortBy, setSortBy] = useState<SortBy>('price_m2_asc');
-  const [chartOpen, setChartOpen] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [limit, setLimit] = useState(20);
+
+  // Reset limit when filters/sort/district change
+  useEffect(() => {
+    setLimit(20);
+  }, [city, district, offerType, filters, sortBy]);
 
   useEffect(() => {
     const fetchListings = async () => {
-      setLoading(true);
+      if (limit === 20) setLoading(true);
+      else setLoadingMore(true);
       setError(null);
 
       try {
-        const params = new URLSearchParams({ city, district, offerType, limit: '20', sortBy });
+        const params = new URLSearchParams({ city, district, offerType, limit: String(limit), sortBy });
         if (filters?.minPrice) params.set('minPrice', String(filters.minPrice));
         if (filters?.maxPrice) params.set('maxPrice', String(filters.maxPrice));
         if (filters?.minSize) params.set('minSize', String(filters.minSize));
@@ -70,16 +76,18 @@ export default function ListingsPanel({ city, district, offerType, filters, onLi
 
         const data = await response.json();
         setListings(data.listings || []);
+        setTotal(data.total ?? data.count ?? 0);
       } catch (err) {
         setError('Failed to load listings');
         console.error(err);
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
 
     fetchListings();
-  }, [city, district, offerType, filters, sortBy]);
+  }, [city, district, offerType, filters, sortBy, limit]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pl-PL').format(price);
@@ -140,23 +148,11 @@ export default function ListingsPanel({ city, district, offerType, filters, onLi
         </button>
       </div>
 
-      {/* Trend Chart */}
-      <div className="border-b border-[#00d4aa15] flex-shrink-0">
-        <button
-          onClick={() => setChartOpen(o => !o)}
-          className="w-full px-3 py-1.5 flex items-center justify-between hover:bg-[#00d4aa08] transition-colors"
-        >
-          <span className="tactical-label">PRICE TREND</span>
-          <span className="font-mono text-xs text-[#00d4aa]">{chartOpen ? '−' : '+'}</span>
-        </button>
-        {chartOpen && <TrendChart city={city} district={district} offerType={offerType} />}
-      </div>
-
       {/* Sort Bar */}
       <div className="px-3 py-2 border-b border-[#00d4aa10] flex items-center gap-1 flex-shrink-0">
         <span className="font-mono text-[10px] text-gray-600 mr-1">SORT</span>
         {([
-          { value: 'price_m2_asc', label: '€/M² ↑' },
+          { value: 'price_m2_asc', label: 'ZŁ/M² ↑' },
           { value: 'price_asc',    label: 'PRICE ↑' },
           { value: 'newest',       label: 'NEW' },
         ] as { value: SortBy; label: string }[]).map(opt => (
@@ -325,12 +321,25 @@ export default function ListingsPanel({ city, district, offerType, filters, onLi
         )}
       </div>
 
+      {/* Load More */}
+      {listings.length > 0 && listings.length < total && (
+        <div className="px-3 py-2 border-t border-[#00d4aa10] flex-shrink-0">
+          <button
+            onClick={() => setLimit(prev => prev + 20)}
+            disabled={loadingMore}
+            className="w-full py-1.5 font-mono text-[10px] text-[#00d4aa] hover:text-white border border-[#00d4aa20] rounded hover:border-[#00d4aa40] transition-colors disabled:opacity-50"
+          >
+            {loadingMore ? 'LOADING...' : `LOAD MORE (${listings.length} of ${total})`}
+          </button>
+        </div>
+      )}
+
       {/* Footer */}
       {listings.length > 0 && (
         <div className="p-2 border-t border-[#00d4aa15] flex-shrink-0">
           <div className="flex items-center justify-between">
             <span className="font-mono text-[10px] text-gray-600">
-              {sortedAndFilteredListings.length}/{listings.length} LISTINGS SHOWN
+              {sortedAndFilteredListings.length} of {total} LISTINGS
             </span>
             <span className="font-mono text-[10px] text-gray-600">
               CLICK TO VIEW ON MORIZON

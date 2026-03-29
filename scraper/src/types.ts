@@ -14,6 +14,14 @@ export interface ScrapedListing {
   title?: string;
   thumbnailUrl?: string;
   scrapedAt: Date;
+  // Extended details (scraped from detail page)
+  description?: string;
+  floor?: number;
+  buildingYear?: number;
+  buildingType?: string;
+  heating?: string;
+  finishCondition?: string;
+  photos?: string[];
 }
 
 export interface DistrictMapping {

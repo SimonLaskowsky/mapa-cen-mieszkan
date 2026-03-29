@@ -1,8 +1,11 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import { formatPercent, type CityData, type DistrictStats } from '@/lib/city-data';
 import CountUp from './CountUp';
 import { useSoundEffects } from '@/lib/useSoundEffects';
+
+type SortKey = 'price' | 'change' | 'name' | 'listings';
 
 interface StatsPanelProps {
   cityData: CityData;
@@ -12,28 +15,62 @@ interface StatsPanelProps {
 
 export default function StatsPanel({ cityData, selectedDistrict, onDistrictSelect }: StatsPanelProps) {
   const { playSound } = useSoundEffects();
+  const [sortKey, setSortKey] = useState<SortKey>('price');
+  const [sortAsc, setSortAsc] = useState(false);
 
   const handleDistrictClick = (districtName: string) => {
     playSound('click');
     const newSelected = selectedDistrict === districtName ? null : districtName;
     onDistrictSelect(newSelected);
   };
-  // Sort districts by price
-  const sortedDistricts = Object.values(cityData.DISTRICT_STATS)
-    .filter(d => d.avgPriceM2 > 0) // Filter out districts with no data
-    .sort((a, b) => b.avgPriceM2 - a.avgPriceM2);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortAsc(prev => !prev);
+    } else {
+      setSortKey(key);
+      // Default direction: price desc, change desc, name asc, listings desc
+      setSortAsc(key === 'name');
+    }
+  };
+
+  const districts = useMemo(() => Object.values(cityData.DISTRICT_STATS)
+    .filter(d => d.avgPriceM2 > 0), [cityData]);
 
   // Show TXN column only when at least one district has RCN data
-  const hasRcnData = sortedDistricts.some((d: DistrictStats) => d.rcnMedianPriceM2);
+  const hasRcnData = districts.some((d: DistrictStats) => d.rcnMedianPriceM2);
+
+  const sortedDistricts = useMemo(() => {
+    const sorted = [...districts];
+    const dir = sortAsc ? 1 : -1;
+    sorted.sort((a, b) => {
+      switch (sortKey) {
+        case 'price': return (a.avgPriceM2 - b.avgPriceM2) * dir;
+        case 'change': return (a.change30d - b.change30d) * dir;
+        case 'listings': return (a.listingCount - b.listingCount) * dir;
+        case 'name': return a.district.localeCompare(b.district) * dir;
+        default: return 0;
+      }
+    });
+    return sorted;
+  }, [districts, sortKey, sortAsc]);
+
+  const arrow = sortAsc ? '↑' : '↓';
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header row */}
+      {/* Header row — clickable to sort */}
       <div className="flex items-center gap-2 pb-2 mb-2 border-b border-[#00d4aa10]">
         <span className="font-mono text-[10px] text-gray-600 w-6">#</span>
-        <span className="font-mono text-[10px] text-gray-600 flex-1">DISTRICT</span>
-        <span className="font-mono text-[10px] text-gray-600 w-16 text-right">PRICE</span>
-        <span className="font-mono text-[10px] text-gray-600 w-12 text-right">Δ30D</span>
+        <button onClick={() => handleSort('name')} className="font-mono text-[10px] text-gray-600 flex-1 text-left hover:text-gray-300 transition-colors">
+          DISTRICT {sortKey === 'name' ? arrow : ''}
+        </button>
+        <button onClick={() => handleSort('price')} className="font-mono text-[10px] text-gray-600 w-16 text-right hover:text-gray-300 transition-colors">
+          PRICE {sortKey === 'price' ? arrow : ''}
+        </button>
+        <button onClick={() => handleSort('change')} className="font-mono text-[10px] text-gray-600 w-12 text-right hover:text-gray-300 transition-colors">
+          Δ30D {sortKey === 'change' ? arrow : ''}
+        </button>
         {hasRcnData && <span className="font-mono text-[10px] text-purple-400 w-12 text-right">TXN</span>}
       </div>
 

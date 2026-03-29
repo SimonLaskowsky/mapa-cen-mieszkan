@@ -6,6 +6,8 @@ import Legend from '@/components/Legend';
 import StatsPanel from '@/components/StatsPanel';
 import ListingsPanel from '@/components/ListingsPanel';
 import CitySelector from '@/components/CitySelector';
+import TrendChart from '@/components/TrendChart';
+import ListingDetail from '@/components/ListingDetail';
 import AddressSearch from '@/components/AddressSearch';
 import CountUp from '@/components/CountUp';
 import { CITIES } from '@/lib/cities';
@@ -18,6 +20,26 @@ interface SearchLocation {
   lat: number;
   lng: number;
   displayName: string;
+}
+
+interface SelectedListing {
+  id: string;
+  lat: number;
+  lng: number;
+  price: number;
+  sizeM2: number;
+  pricePerM2: number;
+  rooms: number | null;
+  address: string | null;
+  url: string;
+  thumbnailUrl: string | null;
+  description: string | null;
+  floor: number | null;
+  buildingYear: number | null;
+  buildingType: string | null;
+  heating: string | null;
+  finishCondition: string | null;
+  photos: string[] | null;
 }
 
 // Map frontend city IDs to API slugs
@@ -62,8 +84,17 @@ export default function Home() {
   const [searchLocation, setSearchLocation] = useState<SearchLocation | null>(null);
   const [focusedDistrict, setFocusedDistrict] = useState<string | null>(null);
   const [hoveredListing, setHoveredListing] = useState<{ id: string; lat: number; lng: number } | null>(null);
+  const [selectedListing, setSelectedListing] = useState<SelectedListing | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [bbox, setBbox] = useState<Bbox | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // Show onboarding on first visit
+  useEffect(() => {
+    if (!localStorage.getItem('onboarding-dismissed')) {
+      setShowOnboarding(true);
+    }
+  }, []);
 
   // Map display options
   const [offerType, setOfferType] = useState<'sale' | 'rent'>('sale');
@@ -71,7 +102,7 @@ export default function Home() {
   const [showDistrictLabels, setShowDistrictLabels] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showDistrictFill, setShowDistrictFill] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(false);
 
   // Listing filters
   const [minPrice, setMinPrice] = useState<string>('');
@@ -83,8 +114,9 @@ export default function Home() {
   // Left panel collapse states
   const [priceIndexOpen, setPriceIndexOpen] = useState(true);
   const [districtAnalysisOpen, setDistrictAnalysisOpen] = useState(true);
-  const [layersOpen, setLayersOpen] = useState(true);
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [layersOpen, setLayersOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [trendOpen, setTrendOpen] = useState(true);
 
   // Ignore & Favourite listings
   const [ignoredListings, setIgnoredListings] = useState<Set<string>>(new Set());
@@ -324,14 +356,17 @@ export default function Home() {
       </div>
 
       {/* Filters Panel */}
-      <div className="tactical-panel tactical-panel-bottom rounded-lg overflow-hidden min-h-fit">
+      <div className={`tactical-panel tactical-panel-bottom rounded-lg overflow-hidden min-h-fit ${(minPrice || maxPrice || minSize || maxSize || selectedRooms.length > 0) ? 'border-yellow-400/30' : ''}`}>
         <button
           onClick={() => setFiltersOpen(!filtersOpen)}
           className="w-full p-3 flex items-center justify-between hover:bg-[#00d4aa08] transition-colors"
         >
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
+            <div className={`w-1.5 h-1.5 rounded-full ${(minPrice || maxPrice || minSize || maxSize || selectedRooms.length > 0) ? 'bg-yellow-400 animate-pulse' : 'bg-[#00d4aa]'}`} />
             <h2 className="tactical-label">LISTING FILTERS</h2>
+            {(minPrice || maxPrice || minSize || maxSize || selectedRooms.length > 0) && (
+              <span className="font-mono text-[10px] text-yellow-400">ACTIVE</span>
+            )}
           </div>
           <span className="font-mono text-xs text-[#00d4aa]">{filtersOpen ? '−' : '+'}</span>
         </button>
@@ -426,6 +461,28 @@ export default function Home() {
         )}
       </div>
 
+      {/* Price Trend Panel — visible when a district is focused */}
+      {focusedDistrict && (
+        <div className="tactical-panel tactical-panel-bottom rounded-lg overflow-hidden flex-shrink-0">
+          <button
+            onClick={() => setTrendOpen(!trendOpen)}
+            className="w-full p-3 flex items-center justify-between hover:bg-[#00d4aa08] transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
+              <h2 className="tactical-label">PRICE TREND</h2>
+              <span className="font-mono text-[10px] text-[#00d4aa]">{focusedDistrict.toUpperCase().replace(/-/g, ' ')}</span>
+            </div>
+            <span className="font-mono text-xs text-[#00d4aa]">{trendOpen ? '−' : '+'}</span>
+          </button>
+          {trendOpen && (
+            <div className="px-2 pb-3">
+              <TrendChart city={citySlug} district={focusedDistrict} offerType={offerType} compact />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Stats Panel */}
       <div className="min-h-fit tactical-panel tactical-panel-bottom rounded-lg overflow-hidden">
         <button
@@ -434,7 +491,7 @@ export default function Home() {
         >
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
-            <h2 className="tactical-label">DISTRICT ANALYSIS</h2>
+            <h2 className="tactical-label">PRICE RANKING</h2>
             {loading && <span className="font-mono text-[10px] text-gray-500 animate-pulse">LOADING...</span>}
           </div>
           <span className="font-mono text-xs text-[#00d4aa]">{districtAnalysisOpen ? '−' : '+'}</span>
@@ -479,13 +536,13 @@ export default function Home() {
             </button>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-[#00d4aa] rounded-full status-live" />
-              <span className="tactical-label hidden sm:inline">SYSTEM ACTIVE</span>
+              <span className="tactical-label hidden sm:inline">LIVE DATA</span>
             </div>
             <div className="h-4 w-px bg-[#00d4aa20]" />
-            <h1 className="font-mono text-lg font-semibold tracking-tight hidden lg:block">
-              <span className="text-[#00d4aa]">REAL ESTATE</span>
+            <h1 className="font-mono text-lg font-semibold tracking-tight hidden xl:block">
+              <span className="text-[#00d4aa]">PRICE</span>
               <span className="text-gray-500">{' // '}</span>
-              <span className="text-white">PRICE MONITOR</span>
+              <span className="text-white">MONITOR</span>
             </h1>
           </div>
 
@@ -555,6 +612,7 @@ export default function Home() {
               ignoredListings={ignoredListings}
               favouriteListings={favouriteListings}
               flyToCity={flyToCity}
+              onListingClick={setSelectedListing}
             />
 
             {/* Status overlay - top right */}
@@ -623,10 +681,10 @@ export default function Home() {
               {focusedDistrict && cityData?.DISTRICT_STATS[focusedDistrict] && (
                 <div className="tactical-panel rounded px-3 py-1.5 flex items-center gap-2">
                   <div className="flex gap-0.5">
-                    <span className="w-2.5 h-2.5 border-2 rotate-45 border-[#05080a]" style={{ background: '#22c55e' }} />
-                    <span className="w-2.5 h-2.5 border-2 rotate-45 border-[#05080a]" style={{ background: '#84cc16' }} />
-                    <span className="w-2.5 h-2.5 border-2 rotate-45 border-[#05080a]" style={{ background: '#eab308' }} />
-                    <span className="w-2.5 h-2.5 border-2 rotate-45 border-[#05080a]" style={{ background: '#f97316' }} />
+                    <span className="w-2.5 h-2.5 border-2 rotate-45 border-[#05080a]" style={{ background: '#3b82f6' }} />
+                    <span className="w-2.5 h-2.5 border-2 rotate-45 border-[#05080a]" style={{ background: '#06b6d4' }} />
+                    <span className="w-2.5 h-2.5 border-2 rotate-45 border-[#05080a]" style={{ background: '#a3a3a3' }} />
+                    <span className="w-2.5 h-2.5 border-2 rotate-45 border-[#05080a]" style={{ background: '#f59e0b' }} />
                     <span className="w-2.5 h-2.5 border-2 rotate-45 border-[#05080a]" style={{ background: '#ef4444' }} />
                   </div>
                   <span className="font-mono text-[10px] text-gray-500">BELOW</span>
@@ -824,9 +882,13 @@ export default function Home() {
         </aside>
       </div>
 
-      {/* Mobile Listings Overlay */}
+      {/* Mobile Listings Bottom Sheet */}
       {focusedDistrict && cityData && (
-        <div className="md:hidden fixed inset-0 z-60 bg-[#05080a]">
+        <div className="md:hidden fixed inset-x-0 bottom-0 top-[35vh] z-60 flex flex-col bg-[#05080a] rounded-t-xl border-t border-[#00d4aa30] shadow-[0_-8px_30px_rgba(0,0,0,0.5)]">
+          {/* Drag handle */}
+          <div className="flex justify-center py-2 flex-shrink-0">
+            <div className="w-10 h-1 bg-gray-600 rounded-full" />
+          </div>
           <ListingsPanel
             city={citySlug}
             district={focusedDistrict}
@@ -849,7 +911,7 @@ export default function Home() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-[#00d4aa] rounded-full status-live" />
-                <span className="tactical-label">CONTROLS</span>
+                <span className="tactical-label">SETTINGS</span>
               </div>
               <button
                 onClick={() => setMobileMenuOpen(false)}
@@ -867,25 +929,69 @@ export default function Home() {
       )}
 
       {/* Footer */}
-      <footer className="flex-shrink-0 px-4 py-2 border-t border-[#00d4aa15] hidden md:block">
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-4">
-            <span className="tactical-label">SYSTEM STATUS:</span>
-            <span className="font-mono text-[#00d4aa]">{loading ? 'SYNCING' : error ? 'ERROR' : 'OPERATIONAL'}</span>
-            <span className="text-gray-600">|</span>
-            <span className="tactical-label">LAST SYNC:</span>
-            <span className="font-mono text-gray-400">
-              {updatedAt ? new Date(updatedAt).toLocaleDateString('pl-PL') : 'N/A'}
+      <footer className="flex-shrink-0 px-4 py-1 border-t border-[#00d4aa15] hidden md:block">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`w-1.5 h-1.5 rounded-full ${loading ? 'bg-yellow-400 animate-pulse' : error ? 'bg-red-400' : 'bg-[#00d4aa]'}`} />
+            <span className="font-mono text-[10px] text-gray-600">
+              {updatedAt ? `UPDATED ${new Date(updatedAt).toLocaleDateString('pl-PL')}` : 'N/A'}
             </span>
-            <span className="text-gray-600">|</span>
-            <span className="tactical-label">SOURCE:</span>
-            <span className="font-mono text-[#00d4aa]">MORIZON</span>
+            <span className="font-mono text-[10px] text-gray-700">·</span>
+            <span className="font-mono text-[10px] text-gray-600">SOURCE: MORIZON</span>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="tactical-label text-gray-600">MAPA CEN MIESZKAŃ v1.0</span>
-          </div>
+          <span className="font-mono text-[10px] text-gray-700">MAPA CEN MIESZKAŃ v1.0</span>
         </div>
       </footer>
+      {/* Listing Detail Modal */}
+      {selectedListing && (
+        <ListingDetail
+          listing={selectedListing}
+          districtAvgPriceM2={
+            focusedDistrict && cityData?.DISTRICT_STATS[focusedDistrict]
+              ? cityData.DISTRICT_STATS[focusedDistrict].avgPriceM2
+              : undefined
+          }
+          districtName={focusedDistrict || undefined}
+          offerType={offerType}
+          onClose={() => setSelectedListing(null)}
+        />
+      )}
+
+      {/* Onboarding overlay — first visit only */}
+      {showOnboarding && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="tactical-panel tactical-panel-bottom rounded-lg p-6 max-w-sm mx-4 text-center">
+            <div className="w-3 h-3 bg-[#00d4aa] rounded-full mx-auto mb-4 status-live" />
+            <h2 className="font-mono text-lg text-white mb-2">PRICE MONITOR</h2>
+            <p className="font-mono text-xs text-gray-400 mb-4 leading-relaxed">
+              Districts are colored by price per m². Click a district to explore listings and price trends.
+            </p>
+            <div className="flex flex-col gap-2 text-left mb-5">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-sm bg-[#22c55e] shrink-0" />
+                <span className="font-mono text-[10px] text-gray-400">Green districts = cheaper</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-sm bg-[#ef4444] shrink-0" />
+                <span className="font-mono text-[10px] text-gray-400">Red districts = more expensive</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rotate-45 bg-[#3b82f6] shrink-0" />
+                <span className="font-mono text-[10px] text-gray-400">Blue markers = listings below avg</span>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setShowOnboarding(false);
+                localStorage.setItem('onboarding-dismissed', '1');
+              }}
+              className="w-full py-2 rounded font-mono text-xs font-semibold tracking-widest bg-[#00d4aa] text-black hover:bg-[#00e4bb] transition-colors"
+            >
+              START EXPLORING
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

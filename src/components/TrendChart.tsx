@@ -14,9 +14,10 @@ interface TrendChartProps {
   district: string;
   offerType?: 'sale' | 'rent';
   onClose?: () => void;
+  compact?: boolean;
 }
 
-export default function TrendChart({ city, district, offerType = 'sale', onClose }: TrendChartProps) {
+export default function TrendChart({ city, district, offerType = 'sale', onClose, compact = false }: TrendChartProps) {
   const [data, setData] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,31 +103,8 @@ export default function TrendChart({ city, district, offerType = 'sale', onClose
   const trendColor = trend && trend.changePercent >= 0 ? '#ef4444' : '#22c55e';
   const trendIcon = trend && trend.changePercent >= 0 ? '▲' : '▼';
 
-  return (
-    <div className="tactical-panel rounded-lg p-4 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
-          <span className="tactical-label">PRICE TREND</span>
-        </div>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-white transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
-      </div>
-
-      {/* District name */}
-      <div className="mb-2">
-        <span className="font-mono text-sm text-white uppercase">{district.replace(/-/g, ' ')}</span>
-      </div>
-
+  const chartContent = (
+    <>
       {/* Trend summary */}
       {trend && (
         <div className="flex items-center gap-2 mb-3">
@@ -141,7 +119,7 @@ export default function TrendChart({ city, district, offerType = 'sale', onClose
       )}
 
       {/* SVG Chart */}
-      <svg width={width} height={height} className="overflow-hidden">
+      <svg width="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-hidden">
         {/* Grid lines */}
         {yTicks.map((tick, i) => {
           const y = padding.top + chartHeight - ((tick - minPrice) / priceRange) * chartHeight;
@@ -228,6 +206,39 @@ export default function TrendChart({ city, district, offerType = 'sale', onClose
         <span className="font-mono text-[10px] text-gray-600">{data.length} DATA POINTS</span>
         <span className="font-mono text-[10px] text-gray-600">AVG PRICE/M²</span>
       </div>
+    </>
+  );
+
+  if (compact) {
+    return <div className="overflow-hidden">{chartContent}</div>;
+  }
+
+  return (
+    <div className="tactical-panel rounded-lg p-4 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
+          <span className="tactical-label">PRICE TREND</span>
+        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-white transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* District name */}
+      <div className="mb-2">
+        <span className="font-mono text-sm text-white uppercase">{district.replace(/-/g, ' ')}</span>
+      </div>
+
+      {chartContent}
     </div>
   );
 }

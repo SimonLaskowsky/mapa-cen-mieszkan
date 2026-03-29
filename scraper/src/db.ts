@@ -33,6 +33,13 @@ export async function insertListings(listings: ScrapedListing[]): Promise<number
     title: l.title,
     thumbnail_url: l.thumbnailUrl,
     scraped_at: l.scrapedAt.toISOString(),
+    description: l.description,
+    floor: l.floor,
+    building_year: l.buildingYear,
+    building_type: l.buildingType,
+    heating: l.heating,
+    finish_condition: l.finishCondition,
+    photos: l.photos,
   }));
 
   const { data, error } = await supabase

@@ -6,21 +6,21 @@ interface LegendProps {
 
 export default function Legend({ offerType = 'sale' }: LegendProps) {
   const saleItems = [
-    { color: '#22c55e', bars: '█░░░░░', label: '< 12K', threat: 'LOW' },
-    { color: '#84cc16', bars: '██░░░░', label: '12-14K', threat: 'MODERATE' },
-    { color: '#eab308', bars: '███░░░', label: '14-16K', threat: 'ELEVATED' },
-    { color: '#f97316', bars: '████░░', label: '16-18K', threat: 'HIGH' },
-    { color: '#ef4444', bars: '█████░', label: '18-22K', threat: 'SEVERE' },
-    { color: '#dc2626', bars: '██████', label: '> 22K', threat: 'CRITICAL' },
+    { color: '#22c55e', bars: '█░░░░░', label: '< 12K', threat: 'CHEAP' },
+    { color: '#84cc16', bars: '██░░░░', label: '12-14K', threat: 'BELOW AVG' },
+    { color: '#eab308', bars: '███░░░', label: '14-16K', threat: 'AVERAGE' },
+    { color: '#f97316', bars: '████░░', label: '16-18K', threat: 'ABOVE AVG' },
+    { color: '#ef4444', bars: '█████░', label: '18-22K', threat: 'EXPENSIVE' },
+    { color: '#dc2626', bars: '██████', label: '> 22K', threat: 'PREMIUM' },
   ];
 
   const rentItems = [
-    { color: '#22c55e', bars: '█░░░░░', label: '< 2.5K', threat: 'LOW' },
-    { color: '#84cc16', bars: '██░░░░', label: '2.5-3.5K', threat: 'MODERATE' },
-    { color: '#eab308', bars: '███░░░', label: '3.5-4.5K', threat: 'ELEVATED' },
-    { color: '#f97316', bars: '████░░', label: '4.5-5.5K', threat: 'HIGH' },
-    { color: '#ef4444', bars: '█████░', label: '5.5-7K', threat: 'SEVERE' },
-    { color: '#dc2626', bars: '██████', label: '> 7K', threat: 'CRITICAL' },
+    { color: '#22c55e', bars: '█░░░░░', label: '< 2.5K', threat: 'CHEAP' },
+    { color: '#84cc16', bars: '██░░░░', label: '2.5-3.5K', threat: 'BELOW AVG' },
+    { color: '#eab308', bars: '███░░░', label: '3.5-4.5K', threat: 'AVERAGE' },
+    { color: '#f97316', bars: '████░░', label: '4.5-5.5K', threat: 'ABOVE AVG' },
+    { color: '#ef4444', bars: '█████░', label: '5.5-7K', threat: 'EXPENSIVE' },
+    { color: '#dc2626', bars: '██████', label: '> 7K', threat: 'PREMIUM' },
   ];
 
   const items = offerType === 'rent' ? rentItems : saleItems;

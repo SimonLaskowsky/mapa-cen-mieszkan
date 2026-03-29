@@ -12,7 +12,34 @@ import {
 // Poland bounding box for sanity-checking extracted coordinates
 const POLAND_BOUNDS = { minLat: 49, maxLat: 55, minLng: 14, maxLng: 25 };
 
-export async function fetchListingCoords(url: string): Promise<{ lat: number; lng: number } | null> {
+export interface ListingDetails {
+  lat?: number;
+  lng?: number;
+  description?: string;
+  floor?: number;
+  buildingYear?: number;
+  buildingType?: string;
+  heating?: string;
+  finishCondition?: string;
+  photos?: string[];
+}
+
+// Known Morizon property detail keys mapped to our fields
+const DETAIL_KEYS: Record<string, keyof ListingDetails> = {
+  'piętro': 'floor',
+  'pietro': 'floor',
+  'rok budowy': 'buildingYear',
+  'rok_budowy': 'buildingYear',
+  'rodzaj zabudowy': 'buildingType',
+  'typ budynku': 'buildingType',
+  'ogrzewanie': 'heating',
+  'stan wykończenia': 'finishCondition',
+  'stan': 'finishCondition',
+};
+
+export async function fetchListingDetails(url: string): Promise<ListingDetails> {
+  const result: ListingDetails = {};
+
   try {
     const response = await fetch(url, {
       headers: {
@@ -20,58 +47,205 @@ export async function fetchListingCoords(url: string): Promise<{ lat: number; ln
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'pl-PL,pl;q=0.9',
       },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(10000),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) return result;
 
     const html = await response.text();
-    const match = html.match(/<script[^>]*id="__NUXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-    if (!match) return null;
 
-    const data: unknown[] = JSON.parse(match[1]);
+    // === Extract from __NUXT_DATA__ (coordinates + structured data) ===
+    const nuxtMatch = html.match(/<script[^>]*id="__NUXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (nuxtMatch) {
+      try {
+        const data: unknown[] = JSON.parse(nuxtMatch[1]);
 
-    // Morizon embeds the listing pin as: {"center": N, "zoom": M}
-    // where data[N] = {"latitude": lat_idx, "longitude": lng_idx}
-    // and data[lat_idx] / data[lng_idx] are the actual floats.
-    for (let i = 0; i < data.length; i++) {
-      const val = data[i];
-      if (
-        val !== null &&
-        typeof val === 'object' &&
-        !Array.isArray(val) &&
-        'center' in val &&
-        'zoom' in val
-      ) {
-        const centerIdx = (val as { center: number }).center;
-        const centerObj = data[centerIdx];
-        if (
-          centerObj !== null &&
-          typeof centerObj === 'object' &&
-          !Array.isArray(centerObj) &&
-          'latitude' in centerObj &&
-          'longitude' in centerObj
-        ) {
-          const latIdx = (centerObj as { latitude: number; longitude: number }).latitude;
-          const lngIdx = (centerObj as { latitude: number; longitude: number }).longitude;
-          const lat = data[latIdx];
-          const lng = data[lngIdx];
+        // Extract coordinates (existing logic)
+        for (let i = 0; i < data.length; i++) {
+          const val = data[i];
           if (
-            typeof lat === 'number' &&
-            typeof lng === 'number' &&
-            lat > POLAND_BOUNDS.minLat && lat < POLAND_BOUNDS.maxLat &&
-            lng > POLAND_BOUNDS.minLng && lng < POLAND_BOUNDS.maxLng
+            val !== null &&
+            typeof val === 'object' &&
+            !Array.isArray(val) &&
+            'center' in val &&
+            'zoom' in val
           ) {
-            return { lat, lng };
+            const centerIdx = (val as { center: number }).center;
+            const centerObj = data[centerIdx];
+            if (
+              centerObj !== null &&
+              typeof centerObj === 'object' &&
+              !Array.isArray(centerObj) &&
+              'latitude' in centerObj &&
+              'longitude' in centerObj
+            ) {
+              const latIdx = (centerObj as { latitude: number; longitude: number }).latitude;
+              const lngIdx = (centerObj as { latitude: number; longitude: number }).longitude;
+              const lat = data[latIdx];
+              const lng = data[lngIdx];
+              if (
+                typeof lat === 'number' &&
+                typeof lng === 'number' &&
+                lat > POLAND_BOUNDS.minLat && lat < POLAND_BOUNDS.maxLat &&
+                lng > POLAND_BOUNDS.minLng && lng < POLAND_BOUNDS.maxLng
+              ) {
+                result.lat = lat;
+                result.lng = lng;
+              }
+            }
           }
         }
+
+        // Find the main property object (has keys like description, photos, floorFormatted, detailedInformation)
+        let mainObj: Record<string, number> | null = null;
+        for (let i = 0; i < data.length; i++) {
+          const val = data[i];
+          if (
+            val && typeof val === 'object' && !Array.isArray(val) &&
+            'description' in val && 'photos' in val && 'detailedInformation' in val
+          ) {
+            mainObj = val as Record<string, number>;
+            break;
+          }
+        }
+
+        if (mainObj) {
+          // Extract description — it's HTML, strip tags to get plain text
+          const descIdx = mainObj.description;
+          if (typeof descIdx === 'number' && typeof data[descIdx] === 'string') {
+            const rawDesc = data[descIdx] as string;
+            const plainText = rawDesc
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/&nbsp;/g, ' ')
+              .replace(/&amp;/g, '&')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&quot;/g, '"')
+              .replace(/&#8222;/g, '„')
+              .replace(/&#8221;/g, '"')
+              .replace(/\s+/g, ' ')
+              .trim();
+            if (plainText.length > 50) {
+              result.description = plainText.slice(0, 2000);
+            }
+          }
+
+          // Extract floor from floorFormatted (e.g., "piętro 1/12" or "1/12")
+          const floorIdx = mainObj.floorFormatted;
+          if (typeof floorIdx === 'number' && typeof data[floorIdx] === 'string') {
+            const floorStr = data[floorIdx] as string;
+            const floorMatch = floorStr.match(/(\d+)\s*\//);
+            if (floorMatch) {
+              const floorNum = parseInt(floorMatch[1], 10);
+              if (floorNum >= 0 && floorNum <= 50) result.floor = floorNum;
+            }
+          }
+
+          // Extract photos — base64-encoded URLs that decode to media.domy.pl image paths
+          // Wrap with Morizon CDN: https://img1.staticmorizon.com.pl/thumb/BASE64
+          const photosIdx = mainObj.photos;
+          if (typeof photosIdx === 'number') {
+            const photosArrRef = data[photosIdx];
+            if (Array.isArray(photosArrRef)) {
+              const photos: string[] = [];
+              for (const photoIdx of photosArrRef) {
+                if (typeof photoIdx === 'number') {
+                  const photoObj = data[photoIdx];
+                  // Each photo entry is an object with a key pointing to the base64 URL
+                  if (photoObj && typeof photoObj === 'object' && !Array.isArray(photoObj)) {
+                    for (const key of Object.values(photoObj as Record<string, number>)) {
+                      if (typeof key === 'number' && typeof data[key] === 'string') {
+                        const val = data[key] as string;
+                        if (val.startsWith('aHR0') && val.length > 50) {
+                          photos.push(`https://img1.staticmorizon.com.pl/thumb/${val}`);
+                          break;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              if (photos.length > 0) {
+                result.photos = photos.slice(0, 15);
+              }
+            }
+          }
+
+          // Extract building details (year, type, heating, condition)
+          // detailedInformation and buildingDetailedInformation are arrays of {label, value} objects
+          const detailArrays = [mainObj.detailedInformation, mainObj.buildingDetailedInformation];
+          for (const arrIdx of detailArrays) {
+            if (typeof arrIdx !== 'number') continue;
+            const arr = data[arrIdx];
+            if (!Array.isArray(arr)) continue;
+
+            for (const itemIdx of arr) {
+              if (typeof itemIdx !== 'number') continue;
+              const item = data[itemIdx];
+              if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+
+              const itemObj = item as Record<string, number>;
+              // Resolve label and value through indices
+              let label = '';
+              let value = '';
+
+              // Try 'label' or 'name' keys for the label
+              for (const labelKey of ['label', 'name']) {
+                if (labelKey in itemObj) {
+                  const lIdx = itemObj[labelKey];
+                  if (typeof lIdx === 'number' && typeof data[lIdx] === 'string') {
+                    label = (data[lIdx] as string).toLowerCase().trim();
+                    break;
+                  }
+                }
+              }
+
+              // Try 'value' or 'values' for the value
+              for (const valKey of ['value', 'values']) {
+                if (valKey in itemObj) {
+                  const vIdx = itemObj[valKey];
+                  if (typeof vIdx === 'number' && typeof data[vIdx] === 'string') {
+                    value = (data[vIdx] as string).trim();
+                    break;
+                  }
+                }
+              }
+
+              if (!label || !value) continue;
+
+              if (label.includes('rok budowy') || label.includes('rok_budowy')) {
+                const year = parseInt(value, 10);
+                if (year >= 1800 && year <= 2030) result.buildingYear = year;
+              } else if (label.includes('rodzaj zabudowy') || label.includes('typ budynku')) {
+                result.buildingType = value.slice(0, 50);
+              } else if (label.includes('ogrzewanie')) {
+                result.heating = value.slice(0, 50);
+              } else if (label.includes('stan nieruchomo') || label.includes('stan wyko') || label === 'stan') {
+                result.finishCondition = value.slice(0, 50);
+              } else if ((label.includes('pi\u0119tro') || label.includes('pietro')) && !result.floor) {
+                // Fallback floor from detailedInformation (e.g., "1/12")
+                const floorNum = parseInt(value, 10);
+                if (!isNaN(floorNum) && floorNum >= 0 && floorNum <= 50) result.floor = floorNum;
+              }
+            }
+          }
+        }
+      } catch {
+        // JSON parse failed, continue with HTML extraction
       }
     }
 
-    return null;
+    return result;
   } catch {
-    return null;
+    return result;
   }
+}
+
+// Backwards-compatible wrapper
+export async function fetchListingCoords(url: string): Promise<{ lat: number; lng: number } | null> {
+  const details = await fetchListingDetails(url);
+  if (details.lat && details.lng) return { lat: details.lat, lng: details.lng };
+  return null;
 }
 
 const DEFAULT_CONFIG: ScraperConfig = {
@@ -364,9 +538,15 @@ export class MorizonScraper {
       const finalDistrict = district || this.parseLocation(raw.title).district;
       if (!finalDistrict) continue;
 
-      const coords = await fetchListingCoords(raw.url);
-      if (coords) {
-        process.stdout.write(` 📍 ${coords.lat.toFixed(4)},${coords.lng.toFixed(4)}`);
+      const details = await fetchListingDetails(raw.url);
+      if (details.lat && details.lng) {
+        process.stdout.write(` 📍 ${details.lat.toFixed(4)},${details.lng.toFixed(4)}`);
+      }
+      if (details.description) {
+        process.stdout.write(` 📝`);
+      }
+      if (details.photos?.length) {
+        process.stdout.write(` 📷${details.photos.length}`);
       }
 
       processed.push({
@@ -375,8 +555,8 @@ export class MorizonScraper {
         city: this.config.city,
         district: finalDistrict,
         address: address || undefined,
-        lat: coords?.lat,
-        lng: coords?.lng,
+        lat: details.lat,
+        lng: details.lng,
         price,
         sizeM2: size,
         rooms: parseRooms(raw.rooms) || undefined,
@@ -385,6 +565,13 @@ export class MorizonScraper {
         title: raw.title || undefined,
         thumbnailUrl: raw.thumbnailUrl || undefined,
         scrapedAt: now,
+        description: details.description,
+        floor: details.floor,
+        buildingYear: details.buildingYear,
+        buildingType: details.buildingType,
+        heating: details.heating,
+        finishCondition: details.finishCondition,
+        photos: details.photos,
       });
 
       // Polite delay between listing page fetches

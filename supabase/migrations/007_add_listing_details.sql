@@ -1,0 +1,8 @@
+-- Add detailed listing fields
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS floor INTEGER;
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS building_year INTEGER;
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS building_type TEXT;
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS heating TEXT;
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS finish_condition TEXT;
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS photos TEXT[];
