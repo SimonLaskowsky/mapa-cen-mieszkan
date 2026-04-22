@@ -157,7 +157,10 @@ export async function fetchListingDetails(url: string): Promise<ListingDetails> 
                       if (typeof key === 'number' && typeof data[key] === 'string') {
                         const val = data[key] as string;
                         if (val.startsWith('aHR0') && val.length > 50) {
-                          photos.push(`https://img1.staticmorizon.com.pl/thumb/${val}`);
+                          // Morizon CDN requires a size spec + filename suffix;
+                          // the bare /thumb/{base64} form returns a 302 to a placeholder.
+                          // 3x2_xs:fill_and_crop is the only size token that works.
+                          photos.push(`https://img1.staticmorizon.com.pl/thumb/${val}/3x2_xs:fill_and_crop/image.jpg`);
                           break;
                         }
                       }

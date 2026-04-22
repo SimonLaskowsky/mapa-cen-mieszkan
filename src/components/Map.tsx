@@ -212,9 +212,19 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
       coordCounts[key] = (coordCounts[key] || 0) + 1;
     });
 
+    // Rent prices (1K–10K) round to unhelpful "1K"/"2K" with plain Math.round;
+    // per-m² for rent (40–120 zł) rounds down to "0.1K". Use enough precision
+    // so low numbers survive, while keeping high numbers (sales) tidy.
+    const fmtCompact = (p: number): string => {
+      if (p >= 1_000_000) return `${(p / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+      if (p >= 100_000)   return `${Math.round(p / 1000)}K`;
+      if (p >= 1000)      return `${(p / 1000).toFixed(1)}K`;
+      return Math.round(p).toString();
+    };
+
     listingsData.forEach((listing, index) => {
-      const priceK = Math.round(listing.price / 1000);
-      const priceM2K = (listing.pricePerM2 / 1000).toFixed(1);
+      const priceText = fmtCompact(listing.price);
+      const priceM2Text = fmtCompact(listing.pricePerM2);
       const pulseColor = avgPriceM2 ? getPriceRatioColor(listing.pricePerM2, avgPriceM2) : '#00d4aa';
 
       // Offset duplicates in a circle around the original point
@@ -292,8 +302,8 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
               display: block;
             " onerror="this.style.display='none'" />
           ` : ''}
-          <div style="color: #00d4aa; font-weight: 600;">${priceK}K PLN</div>
-          <div style="color: rgba(255,255,255,0.6); margin-top: 2px;">${listing.sizeM2}m² · ${priceM2K}K/m²</div>
+          <div style="color: #00d4aa; font-weight: 600;">${priceText} PLN</div>
+          <div style="color: rgba(255,255,255,0.6); margin-top: 2px;">${listing.sizeM2}m² · ${priceM2Text}/m²</div>
           ${listing.rooms ? `<div style="color: rgba(255,255,255,0.4);">${listing.rooms} rooms</div>` : ''}
         </div>
       `;
@@ -446,7 +456,7 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
 
     // Update markers
     addMarkers(mapInstance, data);
-  }, [addMarkers]);
+  }, [addMarkers, offerType]);
 
   // Initialize map
   useEffect(() => {
@@ -842,35 +852,26 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
     onDistrictSelect?.(districtData.stats);
   }, [focusedDistrict, onDistrictSelect]);
 
-  // Fetch and display listing markers + heatmap when district is selected
+  // Fetch listings into state when district/offerType/filters change.
+  // Rendering onto the map is handled by the next effect so that marker colors
+  // re-update when the district's avgPriceM2 arrives from useViewportDistricts
+  // (that fetch is debounced 300ms — before it completes, cityData still holds
+  // the previous offerType's avg, which would tint every rent listing blue).
   useEffect(() => {
-    if (!map.current) return;
-
-    // Clear existing listing markers when district changes
-    clearListingMarkers();
-
-    // Remove existing heatmap/price-circles layers and sources
-    if (map.current.getLayer('listings-heat')) {
-      map.current.removeLayer('listings-heat');
-    }
-    if (map.current.getSource('listings-data')) {
-      map.current.removeSource('listings-data');
-    }
-    if (map.current.getSource('listings-heat-data')) {
-      map.current.removeSource('listings-heat-data');
-    }
-
     if (!focusedDistrict) {
       setListings([]);
       return;
     }
 
     const citySlug = CITY_API_SLUGS[cityId] || cityId;
-    const currentData = cityDataRef.current;
-    const districtStats = currentData.DISTRICT_STATS[focusedDistrict];
-    const tierColor = districtStats ? getTierColor(getPriceTier(districtStats.avgPriceM2)) : '#00d4aa';
+    let cancelled = false;
 
-    const fetchListings = async () => {
+    // Clear previous listings immediately so the render effect doesn't mix
+    // stale sale listings with new rent stats (or vice-versa) while the
+    // new fetch is in flight.
+    setListings([]);
+
+    const run = async () => {
       try {
         const params = new URLSearchParams({
           city: citySlug,
@@ -887,76 +888,110 @@ export default function Map({ cityId, cityData, offerType = 'sale', onBoundsChan
         const response = await fetch(`/api/listings?${params}`);
         if (!response.ok) throw new Error('Failed to fetch');
         const data = await response.json();
+        if (cancelled) return;
+
         const listingsWithCoords = (data.listings || []).filter((l: Listing) => l.lat && l.lng);
         setListings(listingsWithCoords);
-
-        // Play success sound when listings load
-        if (listingsWithCoords.length > 0) {
-          playSound('success');
-        }
-
-        if (map.current && listingsWithCoords.length > 0) {
-          const avgPrice = districtStats?.avgPriceM2 || 1;
-
-          if (showListings) {
-            addListingMarkers(map.current, listingsWithCoords, avgPrice);
-          }
-
-          // Heatmap layer (hidden, kept for future use)
-          if (showHeatmap) {
-            const expensiveListings = listingsWithCoords.filter((l: Listing) => l.pricePerM2 > avgPrice);
-            const heatGeojson = {
-              type: 'FeatureCollection' as const,
-              features: expensiveListings.map((l: Listing) => {
-                const priceRatio = l.pricePerM2 / avgPrice;
-                const weight = Math.min(1, Math.max(0.3, (priceRatio - 1) * 2));
-                return {
-                  type: 'Feature' as const,
-                  geometry: { type: 'Point' as const, coordinates: [l.lng, l.lat] },
-                  properties: { price: l.pricePerM2, weight, priceRatio }
-                };
-              })
-            };
-
-            // Re-use source if heatmap is on alongside circles
-            const heatSourceId = 'listings-heat-data';
-            if (map.current.getSource(heatSourceId)) {
-              (map.current.getSource(heatSourceId) as maplibregl.GeoJSONSource).setData(heatGeojson);
-            } else {
-              map.current.addSource(heatSourceId, { type: 'geojson', data: heatGeojson });
-            }
-
-            map.current.addLayer({
-              id: 'listings-heat',
-              type: 'heatmap',
-              source: heatSourceId,
-              paint: {
-                'heatmap-weight': ['get', 'weight'],
-                'heatmap-intensity': 1,
-                'heatmap-radius': 60,
-                'heatmap-opacity': 1,
-                'heatmap-color': [
-                  'interpolate',
-                  ['linear'],
-                  ['heatmap-density'],
-                  0, 'transparent',
-                  0.1, tierColor + '30',
-                  0.3, tierColor + '60',
-                  0.5, tierColor + '90',
-                  0.7, tierColor + 'c0',
-                  1.0, tierColor + 'ff'
-                ]
-              }
-            });
-          }
-        }
+        if (listingsWithCoords.length > 0) playSound('success');
       } catch (err) {
-        console.error('Failed to fetch listings for map:', err);
+        if (!cancelled) console.error('Failed to fetch listings for map:', err);
       }
     };
 
-    fetchListings();
-  }, [focusedDistrict, cityId, offerType, clearListingMarkers, addListingMarkers, showListings, showHeatmap, listingFilters, playSound]);
+    run();
+    return () => { cancelled = true; };
+  }, [focusedDistrict, cityId, offerType, listingFilters, playSound]);
+
+  // Render listing markers + heatmap. Depends on both `listings` (data) and
+  // the focused district's avgPriceM2 from cityData, so that after the 300ms
+  // viewport-stats refetch completes with new-offerType averages, markers
+  // re-tint using the correct ratio.
+  const focusedDistrictStats = focusedDistrict
+    ? cityData.DISTRICT_STATS[focusedDistrict]
+    : undefined;
+  const focusedAvgPriceM2 = focusedDistrictStats?.avgPriceM2;
+  const focusedStatsOfferType = focusedDistrictStats?.offerType;
+
+  useEffect(() => {
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+
+    // Always start clean — avoids duplicate markers and stale heatmap layers.
+    clearListingMarkers();
+    if (mapInstance.getLayer('listings-heat')) mapInstance.removeLayer('listings-heat');
+    if (mapInstance.getSource('listings-data')) mapInstance.removeSource('listings-data');
+    if (mapInstance.getSource('listings-heat-data')) mapInstance.removeSource('listings-heat-data');
+
+    if (!focusedDistrict || listings.length === 0 || !focusedAvgPriceM2) return;
+
+    // Guard: if the stats we have are for a different offerType than the
+    // listings we just fetched, skip rendering until fresh stats arrive.
+    // Otherwise we'd tint all rent listings as "below average" using the
+    // much-higher sale average (or vice versa).
+    if (focusedStatsOfferType && focusedStatsOfferType !== offerType) return;
+
+    const tierColor = getTierColor(getPriceTier(focusedAvgPriceM2, offerType));
+
+    if (showListings) {
+      addListingMarkers(mapInstance, listings, focusedAvgPriceM2);
+    }
+
+    if (showHeatmap) {
+      const expensiveListings = listings.filter((l) => l.pricePerM2 > focusedAvgPriceM2);
+      const heatGeojson = {
+        type: 'FeatureCollection' as const,
+        features: expensiveListings.map((l) => {
+          const priceRatio = l.pricePerM2 / focusedAvgPriceM2;
+          const weight = Math.min(1, Math.max(0.3, (priceRatio - 1) * 2));
+          return {
+            type: 'Feature' as const,
+            geometry: { type: 'Point' as const, coordinates: [l.lng, l.lat] },
+            properties: { price: l.pricePerM2, weight, priceRatio },
+          };
+        }),
+      };
+
+      const heatSourceId = 'listings-heat-data';
+      if (mapInstance.getSource(heatSourceId)) {
+        (mapInstance.getSource(heatSourceId) as maplibregl.GeoJSONSource).setData(heatGeojson);
+      } else {
+        mapInstance.addSource(heatSourceId, { type: 'geojson', data: heatGeojson });
+      }
+
+      mapInstance.addLayer({
+        id: 'listings-heat',
+        type: 'heatmap',
+        source: heatSourceId,
+        paint: {
+          'heatmap-weight': ['get', 'weight'],
+          'heatmap-intensity': 1,
+          'heatmap-radius': 60,
+          'heatmap-opacity': 1,
+          'heatmap-color': [
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
+            0, 'transparent',
+            0.1, tierColor + '30',
+            0.3, tierColor + '60',
+            0.5, tierColor + '90',
+            0.7, tierColor + 'c0',
+            1.0, tierColor + 'ff',
+          ],
+        },
+      });
+    }
+  }, [
+    listings,
+    focusedDistrict,
+    focusedAvgPriceM2,
+    focusedStatsOfferType,
+    offerType,
+    showListings,
+    showHeatmap,
+    clearListingMarkers,
+    addListingMarkers,
+  ]);
 
   // Toggle district labels visibility (respects zoom)
   useEffect(() => {

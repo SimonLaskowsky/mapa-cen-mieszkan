@@ -1,29 +1,51 @@
+// Polish diacritics → ASCII. NFD decomposition does NOT handle ł/Ł (they are
+// standalone Unicode code points, not base + combining mark), so we map them
+// explicitly along with the rest for consistency across our DB (which already
+// contains mixed forms like "białołeka", "praga-połnoc").
+const POLISH_TO_ASCII: Record<string, string> = {
+  ł: 'l', Ł: 'L',
+  ą: 'a', Ą: 'A',
+  ć: 'c', Ć: 'C',
+  ę: 'e', Ę: 'E',
+  ń: 'n', Ń: 'N',
+  ó: 'o', Ó: 'O',
+  ś: 's', Ś: 'S',
+  ź: 'z', Ź: 'Z',
+  ż: 'z', Ż: 'Z',
+};
+
+/**
+ * Strip Polish diacritics (ł, ą, ć, ę, ń, ó, ś, ź, ż and their uppercase forms)
+ * plus any remaining combining marks via NFD. Safe for slug comparison.
+ */
+export function stripPolish(s: string): string {
+  return s
+    .replace(/[łŁąĄćĆęĘńŃóÓśŚźŹżŻ]/g, (c) => POLISH_TO_ASCII[c] ?? c)
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
 /**
  * Normalize district name to match database format
  */
 export function normalizeDistrict(name: string, mappings: Map<string, string>): string | null {
   if (!name) return null;
 
-  // Clean up the name
-  const cleaned = name
-    .toLowerCase()
-    .trim()
+  // Lowercase, trim, spaces→dashes, collapse runs of dashes (Otodom sometimes
+  // produces "praga--poludnie" from its breadcrumbs).
+  const cleaned = stripPolish(name.toLowerCase().trim())
     .replace(/\s+/g, '-')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, ''); // Remove diacritics
+    .replace(/-+/g, '-');
 
-  // Try exact match
   if (mappings.has(cleaned)) {
     return mappings.get(cleaned)!;
   }
 
-  // Try with spaces instead of dashes
   const withSpaces = cleaned.replace(/-/g, ' ');
   if (mappings.has(withSpaces)) {
     return mappings.get(withSpaces)!;
   }
 
-  // Try partial match (district name contains the searched term)
   for (const [key, value] of mappings) {
     if (key.includes(cleaned) || cleaned.includes(key)) {
       return value;
@@ -39,7 +61,6 @@ export function normalizeDistrict(name: string, mappings: Map<string, string>): 
 export function parsePrice(priceStr: string): number | null {
   if (!priceStr) return null;
 
-  // Remove currency symbols, spaces, and non-numeric characters except comma/dot
   const cleaned = priceStr
     .replace(/[^\d,.\s]/g, '')
     .replace(/\s/g, '')
@@ -55,7 +76,6 @@ export function parsePrice(priceStr: string): number | null {
 export function parseSize(sizeStr: string): number | null {
   if (!sizeStr) return null;
 
-  // Extract number, handling both comma and dot as decimal separators
   const match = sizeStr.match(/(\d+[,.]?\d*)/);
   if (!match) return null;
 

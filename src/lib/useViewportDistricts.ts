@@ -68,13 +68,15 @@ export function useViewportDistricts(
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const abortController = useRef<AbortController>(undefined);
   const lastBboxStr = useRef<string>('');
+  const lastOfferType = useRef<string>('');
 
   const fetchData = useCallback(async (currentBbox: Bbox, currentOfferType: string) => {
     const bboxStr = currentBbox.map(n => n.toFixed(4)).join(',');
 
-    // Skip if bbox hasn't changed meaningfully
-    if (bboxStr === lastBboxStr.current) return;
+    // Skip if neither bbox nor offerType changed
+    if (bboxStr === lastBboxStr.current && currentOfferType === lastOfferType.current) return;
     lastBboxStr.current = bboxStr;
+    lastOfferType.current = currentOfferType;
 
     // Abort previous request
     if (abortController.current) {

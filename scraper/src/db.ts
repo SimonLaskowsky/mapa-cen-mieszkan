@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import type { ScrapedListing } from './types.js';
+import { stripPolish } from './utils/normalize.js';
 
 // Load env from parent directory
 dotenv.config({ path: '../.env.local' });
@@ -69,16 +70,14 @@ export async function getDistrictMappings(city: string): Promise<Map<string, str
     return new Map();
   }
 
-  // Create a map for fuzzy matching
+  // Build a fuzzy-matching map. Keys are the different forms we might see
+  // from scrapers (with Polish diacritics, without, etc.); values are the
+  // canonical district string as stored in the DB.
   const map = new Map<string, string>();
   for (const row of data || []) {
-    // Store normalized version
-    map.set(row.district.toLowerCase(), row.district);
-    // Store without diacritics
-    const noDiacritics = row.district
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-    map.set(noDiacritics.toLowerCase(), row.district);
+    const canonical = (row as { district: string }).district;
+    map.set(canonical.toLowerCase(), canonical);
+    map.set(stripPolish(canonical.toLowerCase()), canonical);
   }
 
   return map;

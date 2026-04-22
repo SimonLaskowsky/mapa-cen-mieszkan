@@ -953,6 +953,10 @@ export default function Home() {
           }
           districtName={focusedDistrict || undefined}
           offerType={offerType}
+          isFavourite={favouriteListings.has(selectedListing.id)}
+          isIgnored={ignoredListings.has(selectedListing.id)}
+          onFavourite={toggleFavourite}
+          onIgnore={toggleIgnore}
           onClose={() => setSelectedListing(null)}
         />
       )}

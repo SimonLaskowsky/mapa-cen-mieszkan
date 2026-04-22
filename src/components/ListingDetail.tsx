@@ -25,12 +25,17 @@ interface ListingDetailProps {
   districtAvgPriceM2?: number;
   districtName?: string;
   offerType: 'sale' | 'rent';
+  isFavourite?: boolean;
+  isIgnored?: boolean;
+  onFavourite?: (id: string) => void;
+  onIgnore?: (id: string) => void;
   onClose: () => void;
 }
 
-export default function ListingDetail({ listing, districtAvgPriceM2, districtName, offerType, onClose }: ListingDetailProps) {
+export default function ListingDetail({ listing, districtAvgPriceM2, districtName, offerType, isFavourite, isIgnored, onFavourite, onIgnore, onClose }: ListingDetailProps) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [descExpanded, setDescExpanded] = useState(false);
+  const [failedPhotos, setFailedPhotos] = useState<Set<number>>(new Set());
 
   const formatPrice = (price: number) => new Intl.NumberFormat('pl-PL').format(price);
 
@@ -48,9 +53,20 @@ export default function ListingDetail({ listing, districtAvgPriceM2, districtNam
     else { dealLabel = 'EXPENSIVE'; dealColor = 'text-red-400'; }
   }
 
-  // Photos: use photos array if available, fall back to single thumbnail
-  const photos = listing.photos?.length ? listing.photos : (listing.thumbnailUrl ? [listing.thumbnailUrl] : []);
+  // Photos: use photos array if available, fall back to single thumbnail.
+  // Backfill fix for a scraper bug where Morizon photo URLs were stored
+  // without the size/filename suffix; the CDN responds with a 302 placeholder
+  // unless we append it. Safe to run on already-correct URLs.
+  const normalizeMorizonPhoto = (url: string): string => {
+    if (!url.startsWith('https://img1.staticmorizon.com.pl/thumb/')) return url;
+    if (url.includes(':fill_and_crop/') || url.endsWith('.jpg')) return url;
+    return `${url.replace(/\/$/, '')}/3x2_xs:fill_and_crop/image.jpg`;
+  };
+  const rawPhotos = listing.photos?.length ? listing.photos : (listing.thumbnailUrl ? [listing.thumbnailUrl] : []);
+  const photos = rawPhotos.map(normalizeMorizonPhoto);
   const hasMultiplePhotos = photos.length > 1;
+  const allPhotosFailed = photos.length > 0 && failedPhotos.size >= photos.length;
+  const currentPhotoFailed = failedPhotos.has(photoIndex);
 
   // Property details (only show if data exists)
   const details: { label: string; value: string }[] = [];
@@ -75,15 +91,31 @@ export default function ListingDetail({ listing, districtAvgPriceM2, districtNam
         className="relative w-full sm:max-w-lg mx-0 sm:mx-4 tactical-panel tactical-panel-bottom rounded-t-xl sm:rounded-lg overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Photo carousel */}
-        {photos.length > 0 && (
+        {/* Photo carousel. If every photo fails to load (typically hot-link
+            protection on the source CDN) we collapse it entirely rather than
+            leave an empty dark box with dangling counter and arrows. */}
+        {photos.length > 0 && !allPhotosFailed && (
           <div className="relative w-full h-52 sm:h-60 bg-[#0a1218] flex-shrink-0">
-            <img
-              src={photos[photoIndex]}
-              alt=""
-              className="w-full h-full object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
+            {currentPhotoFailed ? (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-gray-600">
+                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="font-mono text-[10px] tracking-wider">IMAGE UNAVAILABLE</span>
+              </div>
+            ) : (
+              <img
+                src={photos[photoIndex]}
+                alt=""
+                className="w-full h-full object-cover"
+                onError={() => setFailedPhotos((prev) => {
+                  if (prev.has(photoIndex)) return prev;
+                  const next = new Set(prev);
+                  next.add(photoIndex);
+                  return next;
+                })}
+              />
+            )}
             {/* Deal badge */}
             {dealLabel && (
               <div className="absolute top-3 left-3">
@@ -100,21 +132,29 @@ export default function ListingDetail({ listing, districtAvgPriceM2, districtNam
                 </span>
               </div>
             )}
-            {/* Nav arrows */}
+            {/* Nav arrows. inset-y-0 + flex items-center pins each arrow to
+                the exact vertical center of the carousel regardless of how the
+                image renders, which is more robust than top-1/2 + translate. */}
             {hasMultiplePhotos && (
               <>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setPhotoIndex(i => i > 0 ? i - 1 : photos.length - 1); }}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-                >
-                  <span className="font-mono text-sm">&lt;</span>
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setPhotoIndex(i => i < photos.length - 1 ? i + 1 : 0); }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-                >
-                  <span className="font-mono text-sm">&gt;</span>
-                </button>
+                <div className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPhotoIndex(i => i > 0 ? i - 1 : photos.length - 1); }}
+                    className="pointer-events-auto w-8 h-8 flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                    aria-label="Previous photo"
+                  >
+                    <span className="font-mono text-sm leading-none">&lt;</span>
+                  </button>
+                </div>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPhotoIndex(i => i < photos.length - 1 ? i + 1 : 0); }}
+                    className="pointer-events-auto w-8 h-8 flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                    aria-label="Next photo"
+                  >
+                    <span className="font-mono text-sm leading-none">&gt;</span>
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -212,21 +252,57 @@ export default function ListingDetail({ listing, districtAvgPriceM2, districtNam
           )}
 
           {/* Actions */}
-          <div className="flex gap-2">
-            <a
-              href={listing.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 py-2.5 rounded font-mono text-xs font-semibold tracking-widest bg-[#00d4aa] text-black hover:bg-[#00e4bb] transition-colors text-center"
-            >
-              VIEW ON MORIZON
-            </a>
-            <button
-              onClick={onClose}
-              className="px-4 py-2.5 rounded font-mono text-xs text-gray-400 hover:text-white border border-[#00d4aa20] hover:border-[#00d4aa40] transition-colors"
-            >
-              CLOSE
-            </button>
+          <div className="flex flex-col gap-2">
+            {/* Save / Ignore row */}
+            <div className="flex gap-2">
+              {onFavourite && (
+                <button
+                  onClick={() => onFavourite(listing.id)}
+                  className={`flex-1 py-2 rounded font-mono text-xs font-semibold tracking-wider border transition-colors flex items-center justify-center gap-1.5 ${
+                    isFavourite
+                      ? 'bg-yellow-400/15 border-yellow-400/40 text-yellow-400'
+                      : 'border-[#00d4aa20] text-gray-400 hover:text-yellow-400 hover:border-yellow-400/30'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill={isFavourite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                  {isFavourite ? 'SAVED' : 'SAVE'}
+                </button>
+              )}
+              {onIgnore && (
+                <button
+                  onClick={() => onIgnore(listing.id)}
+                  className={`flex-1 py-2 rounded font-mono text-xs font-semibold tracking-wider border transition-colors flex items-center justify-center gap-1.5 ${
+                    isIgnored
+                      ? 'bg-red-400/15 border-red-400/40 text-red-400'
+                      : 'border-[#00d4aa20] text-gray-400 hover:text-red-400 hover:border-red-400/30'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                  {isIgnored ? 'IGNORED' : 'HIDE'}
+                </button>
+              )}
+            </div>
+            {/* Primary actions row */}
+            <div className="flex gap-2">
+              <a
+                href={listing.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 py-2.5 rounded font-mono text-xs font-semibold tracking-widest bg-[#00d4aa] text-black hover:bg-[#00e4bb] transition-colors text-center"
+              >
+                VIEW ON MORIZON
+              </a>
+              <button
+                onClick={onClose}
+                className="px-4 py-2.5 rounded font-mono text-xs text-gray-400 hover:text-white border border-[#00d4aa20] hover:border-[#00d4aa40] transition-colors"
+              >
+                CLOSE
+              </button>
+            </div>
           </div>
         </div>
       </div>
