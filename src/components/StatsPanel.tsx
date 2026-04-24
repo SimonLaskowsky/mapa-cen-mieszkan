@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { formatPercent, type CityData, type DistrictStats } from '@/lib/city-data';
+import { type CityData, type DistrictStats } from '@/lib/city-data';
 import CountUp from './CountUp';
 import { useSoundEffects } from '@/lib/useSoundEffects';
 
@@ -57,62 +57,97 @@ export default function StatsPanel({ cityData, selectedDistrict, onDistrictSelec
 
   const arrow = sortAsc ? '↑' : '↓';
 
+  const sortOptions: { key: SortKey; label: string }[] = [
+    { key: 'price', label: 'PRICE' },
+    { key: 'change', label: 'Δ30D' },
+    { key: 'listings', label: 'LIST' },
+    { key: 'name', label: 'A-Z' },
+  ];
+
   return (
     <div className="h-full flex flex-col">
-      {/* Header row — clickable to sort */}
-      <div className="flex items-center gap-2 pb-2 mb-2 border-b border-[#00d4aa10]">
-        <span className="font-mono text-[10px] text-gray-600 w-6">#</span>
-        <button onClick={() => handleSort('name')} className="font-mono text-[10px] text-gray-600 flex-1 text-left hover:text-gray-300 transition-colors">
-          DISTRICT {sortKey === 'name' ? arrow : ''}
-        </button>
-        <button onClick={() => handleSort('price')} className="font-mono text-[10px] text-gray-600 w-16 text-right hover:text-gray-300 transition-colors">
-          PRICE {sortKey === 'price' ? arrow : ''}
-        </button>
-        <button onClick={() => handleSort('change')} className="font-mono text-[10px] text-gray-600 w-12 text-right hover:text-gray-300 transition-colors">
-          Δ30D {sortKey === 'change' ? arrow : ''}
-        </button>
-        {hasRcnData && <span className="font-mono text-[10px] text-purple-400 w-12 text-right">TXN</span>}
+      {/* Sort controls — pill buttons */}
+      <div className="pb-2 mb-2 border-b border-[#00d4aa10] flex items-center gap-1 flex-wrap">
+        <span className="font-mono text-[10px] text-gray-600 mr-1">SORT</span>
+        {sortOptions.map(opt => {
+          const active = sortKey === opt.key;
+          return (
+            <button
+              key={opt.key}
+              onClick={() => handleSort(opt.key)}
+              className={`px-2 py-1 rounded font-mono text-[10px] transition-colors ${
+                active
+                  ? 'bg-[#00d4aa] text-black'
+                  : 'bg-[#00d4aa15] text-gray-400 hover:bg-[#00d4aa25]'
+              }`}
+            >
+              {opt.label}{active ? ` ${arrow}` : ''}
+            </button>
+          );
+        })}
       </div>
 
-      {/* District list */}
-      <div className="flex-1 overflow-y-auto space-y-0.5 pr-1 min-h-[150px]">
+      {/* District list — 2-row layout: full name on top, stats below */}
+      <div className="flex-1 overflow-y-auto divide-y divide-[#00d4aa10] pr-1 min-h-[150px]">
         {sortedDistricts.map((district, index) => {
           const isHot = district.change30d > 2;
           const isCold = district.change30d < 0;
           const changeColor = district.change30d >= 0 ? 'text-red-400' : 'text-green-400';
-
+          const changeIcon = district.change30d >= 0 ? '▲' : '▼';
           const isSelected = selectedDistrict === district.district;
 
           return (
             <div
               key={district.district}
               onClick={() => handleDistrictClick(district.district)}
-              className={`flex items-center gap-2 py-1.5 px-1 rounded hover:bg-[#00d4aa08] transition-colors cursor-pointer group ${isSelected ? 'bg-[#00d4aa15] border-l-2 border-[#00d4aa]' : ''}`}
+              className={`py-2 px-2 rounded hover:bg-[#00d4aa08] transition-colors cursor-pointer group flex items-center gap-2 ${
+                isSelected ? 'bg-[#00d4aa12] border-l-2 border-[#00d4aa]' : 'border-l-2 border-transparent'
+              }`}
             >
-              <span className="font-mono text-[10px] text-gray-600 w-6">
-                {String(index + 1).padStart(2, '0')}
-              </span>
-              <div className="flex-1 min-w-0 flex items-center gap-2">
-                <span className="font-mono text-xs text-gray-300 truncate group-hover:text-[#00d4aa] transition-colors">
-                  {district.district.toUpperCase()}
-                </span>
-                {isHot && (
-                  <span className="font-mono text-[8px] text-red-500 bg-red-500/10 px-1 rounded">HOT</span>
-                )}
-                {isCold && (
-                  <span className="font-mono text-[8px] text-green-500 bg-green-500/10 px-1 rounded">DIP</span>
-                )}
+              {/* Main content — two rows stacked */}
+              <div className="flex-1 min-w-0">
+                {/* Row 1 — index + full district name */}
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] text-gray-600 shrink-0 w-6">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <span className="font-mono text-xs text-gray-200 group-hover:text-[#00d4aa] transition-colors font-semibold flex-1 min-w-0 truncate">
+                    {district.district.toUpperCase().replace(/-/g, ' ')}
+                  </span>
+                </div>
+
+                {/* Row 2 — stats, indented under name */}
+                <div className="flex items-center gap-2 pl-8 mt-1 font-mono text-[11px]">
+                  <span className="text-white font-semibold">
+                    {(district.avgPriceM2 / 1000).toFixed(1)}K
+                  </span>
+                  <span className="text-gray-700">·</span>
+                  <span className={changeColor}>
+                    {changeIcon} {Math.abs(district.change30d).toFixed(1)}%
+                  </span>
+                  {hasRcnData && (
+                    <>
+                      <span className="text-gray-700">·</span>
+                      <span className="text-purple-400">
+                        {district.rcnMedianPriceM2 ? `TXN ${(district.rcnMedianPriceM2 / 1000).toFixed(1)}K` : 'TXN —'}
+                      </span>
+                    </>
+                  )}
+                  <span className="text-gray-700">·</span>
+                  <span className="text-gray-500">{district.listingCount}</span>
+                </div>
               </div>
-              <span className="font-mono text-xs text-white w-16 text-right">
-                {(district.avgPriceM2 / 1000).toFixed(1)}K
-              </span>
-              <span className={`font-mono text-xs w-12 text-right ${changeColor}`}>
-                {formatPercent(district.change30d)}
-              </span>
-              {hasRcnData && (
-                <span className="font-mono text-xs w-12 text-right text-purple-400">
-                  {district.rcnMedianPriceM2 ? `${(district.rcnMedianPriceM2 / 1000).toFixed(1)}K` : '—'}
-                </span>
+
+              {/* Badge — centered vertically against the two-row content */}
+              {(isHot || isCold) && (
+                <div className="shrink-0 flex items-center">
+                  {isHot && (
+                    <span className="font-mono text-[8px] text-red-500 bg-red-500/10 px-1 py-0.5 rounded">HOT</span>
+                  )}
+                  {isCold && (
+                    <span className="font-mono text-[8px] text-green-500 bg-green-500/10 px-1 py-0.5 rounded">DIP</span>
+                  )}
+                </div>
               )}
             </div>
           );

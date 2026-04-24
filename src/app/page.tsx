@@ -5,11 +5,14 @@ import dynamic from 'next/dynamic';
 import Legend from '@/components/Legend';
 import StatsPanel from '@/components/StatsPanel';
 import ListingsPanel from '@/components/ListingsPanel';
+import ListingsFullscreen from '@/components/ListingsFullscreen';
+import { type SortBy } from '@/components/SortButtons';
 import CitySelector from '@/components/CitySelector';
 import TrendChart from '@/components/TrendChart';
 import ListingDetail from '@/components/ListingDetail';
 import AddressSearch from '@/components/AddressSearch';
 import CountUp from '@/components/CountUp';
+import Logo from '@/components/Logo';
 import { CITIES } from '@/lib/cities';
 import { type DistrictStats } from '@/lib/city-data';
 import { useViewportDistricts, type Bbox } from '@/lib/useViewportDistricts';
@@ -83,6 +86,8 @@ export default function Home() {
   const [flyToCity, setFlyToCity] = useState<string | null>(null);
   const [searchLocation, setSearchLocation] = useState<SearchLocation | null>(null);
   const [focusedDistrict, setFocusedDistrict] = useState<string | null>(null);
+  const [listingsFullscreen, setListingsFullscreen] = useState(false);
+  const [listingsSortBy, setListingsSortBy] = useState<SortBy>('price_m2_asc');
   const [hoveredListing, setHoveredListing] = useState<{ id: string; lat: number; lng: number } | null>(null);
   const [selectedListing, setSelectedListing] = useState<SelectedListing | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -326,7 +331,7 @@ export default function Home() {
         >
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-[#00d4aa] rounded-full" />
-            <h2 className="tactical-label">LAYERS</h2>
+            <h2 className="tactical-label">MAP LAYERS</h2>
           </div>
           <span className="font-mono text-xs text-[#00d4aa]">{layersOpen ? '−' : '+'}</span>
         </button>
@@ -476,7 +481,7 @@ export default function Home() {
             <span className="font-mono text-xs text-[#00d4aa]">{trendOpen ? '−' : '+'}</span>
           </button>
           {trendOpen && (
-            <div className="px-2 pb-3">
+            <div className="px-1 pb-3">
               <TrendChart city={citySlug} district={focusedDistrict} offerType={offerType} compact />
             </div>
           )}
@@ -534,16 +539,12 @@ export default function Home() {
               <span className="block w-5 h-0.5 bg-[#00d4aa]" />
               <span className="block w-5 h-0.5 bg-[#00d4aa]" />
             </button>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-[#00d4aa] rounded-full status-live" />
-              <span className="tactical-label hidden sm:inline">LIVE DATA</span>
+            <div className="hidden sm:block">
+              <Logo />
             </div>
-            <div className="h-4 w-px bg-[#00d4aa20]" />
-            <h1 className="font-mono text-lg font-semibold tracking-tight hidden xl:block">
-              <span className="text-[#00d4aa]">PRICE</span>
-              <span className="text-gray-500">{' // '}</span>
-              <span className="text-white">MONITOR</span>
-            </h1>
+            <div className="sm:hidden">
+              <Logo showWordmark={false} />
+            </div>
           </div>
 
           {/* Center - City Selector (fills available space) */}
@@ -693,6 +694,25 @@ export default function Home() {
                 </div>
               )}
             </div>
+
+            {/* Listings list view — overlays the map while keeping it mounted underneath */}
+            {focusedDistrict && cityData && listingsFullscreen && (
+              <ListingsFullscreen
+                city={citySlug}
+                district={focusedDistrict}
+                offerType={offerType}
+                filters={listingFilters}
+                sortBy={listingsSortBy}
+                onSortChange={setListingsSortBy}
+                districtAvgPriceM2={cityData.DISTRICT_STATS[focusedDistrict]?.avgPriceM2}
+                onListingHover={(listing) => setHoveredListing(listing ? { id: listing.id, lat: listing.lat, lng: listing.lng } : null)}
+                onClose={() => setListingsFullscreen(false)}
+                ignoredListings={ignoredListings}
+                favouriteListings={favouriteListings}
+                onIgnore={toggleIgnore}
+                onFavourite={toggleFavourite}
+              />
+            )}
 
           </div>
 
@@ -861,17 +881,20 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Right Sidebar - District Listings (desktop) */}
-        <aside className={`hidden md:block shrink-0 overflow-hidden transition-all duration-300 ease-in-out ${focusedDistrict && cityData ? 'w-80' : 'w-0'}`}>
-          {focusedDistrict && cityData && (
+        {/* Right Sidebar - District Listings (desktop; hidden when fullscreen list is on) */}
+        <aside className={`hidden md:block shrink-0 overflow-hidden transition-all duration-300 ease-in-out ${focusedDistrict && cityData && !listingsFullscreen ? 'w-80' : 'w-0'}`}>
+          {focusedDistrict && cityData && !listingsFullscreen && (
             <div className="w-80 h-full tactical-panel rounded-lg overflow-hidden">
               <ListingsPanel
                 city={citySlug}
                 district={focusedDistrict}
                 offerType={offerType}
                 filters={listingFilters}
+                sortBy={listingsSortBy}
+                onSortChange={setListingsSortBy}
+                onExpand={() => setListingsFullscreen(true)}
                 onListingHover={(listing) => setHoveredListing(listing ? { id: listing.id, lat: listing.lat, lng: listing.lng } : null)}
-                onClose={() => setFocusedDistrict(null)}
+                onClose={() => { setFocusedDistrict(null); setListingsFullscreen(false); }}
                 ignoredListings={ignoredListings}
                 favouriteListings={favouriteListings}
                 onIgnore={toggleIgnore}
@@ -894,6 +917,8 @@ export default function Home() {
             district={focusedDistrict}
             offerType={offerType}
             filters={listingFilters}
+            sortBy={listingsSortBy}
+            onSortChange={setListingsSortBy}
             onListingHover={(listing) => setHoveredListing(listing ? { id: listing.id, lat: listing.lat, lng: listing.lng } : null)}
             onClose={() => setFocusedDistrict(null)}
             ignoredListings={ignoredListings}
@@ -939,7 +964,7 @@ export default function Home() {
             <span className="font-mono text-[10px] text-gray-700">·</span>
             <span className="font-mono text-[10px] text-gray-600">SOURCE: MORIZON</span>
           </div>
-          <span className="font-mono text-[10px] text-gray-700">MAPA CEN MIESZKAŃ v1.0</span>
+          <span className="font-mono text-[10px] text-gray-700">RYNKORADAR v1.0</span>
         </div>
       </footer>
       {/* Listing Detail Modal */}
@@ -965,8 +990,9 @@ export default function Home() {
       {showOnboarding && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="tactical-panel tactical-panel-bottom rounded-lg p-6 max-w-sm mx-4 text-center">
-            <div className="w-3 h-3 bg-[#00d4aa] rounded-full mx-auto mb-4 status-live" />
-            <h2 className="font-mono text-lg text-white mb-2">PRICE MONITOR</h2>
+            <div className="mx-auto mb-3 flex justify-center">
+              <Logo size={40} />
+            </div>
             <p className="font-mono text-xs text-gray-400 mb-4 leading-relaxed">
               Districts are colored by price per m². Click a district to explore listings and price trends.
             </p>

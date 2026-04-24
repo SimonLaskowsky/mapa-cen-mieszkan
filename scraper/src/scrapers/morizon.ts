@@ -159,8 +159,11 @@ export async function fetchListingDetails(url: string): Promise<ListingDetails> 
                         if (val.startsWith('aHR0') && val.length > 50) {
                           // Morizon CDN requires a size spec + filename suffix;
                           // the bare /thumb/{base64} form returns a 302 to a placeholder.
-                          // 3x2_xs:fill_and_crop is the only size token that works.
-                          photos.push(`https://img1.staticmorizon.com.pl/thumb/${val}/3x2_xs:fill_and_crop/image.jpg`);
+                          // Supported size tokens: xs (300x200), s (450x300), m (600x400),
+                          // l (900x600), xl (1024x768). We store `l` as a good default for
+                          // card-grid rendering; the frontend rewrites to xl for the detail
+                          // modal and down to m/s for thumbnails.
+                          photos.push(`https://img1.staticmorizon.com.pl/thumb/${val}/3x2_l:fill_and_crop/image.jpg`);
                           break;
                         }
                       }

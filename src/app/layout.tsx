@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Mapa Cen Mieszkań | Ceny nieruchomości w Polsce',
-  description: 'Interaktywna mapa cen mieszkań w Polsce. Sprawdź ceny za m² w swojej dzielnicy, śledź trendy i znajdź okazje.',
-  keywords: ['ceny mieszkań', 'mapa cen', 'nieruchomości Warszawa', 'cena za metr', 'mieszkania Polska'],
+  title: 'RynkoRadar | Radar cen mieszkań w Polsce',
+  description: 'Interaktywna mapa cen mieszkań w Polsce. Porównaj ceny ofertowe z realnymi transakcjami, śledź trendy w dzielnicach i znajdź okazje zanim znikną.',
+  keywords: ['rynkoradar', 'ceny mieszkań', 'mapa cen', 'nieruchomości Warszawa', 'cena za metr', 'mieszkania Polska', 'radar okazji'],
 };
 
 export default function RootLayout({

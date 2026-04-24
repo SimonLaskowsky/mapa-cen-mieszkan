@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const district = searchParams.get('district');
     const offerType = searchParams.get('offerType') || 'sale';
     const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const sortBy = searchParams.get('sortBy') || 'newest'; // newest | price_m2_asc | price_asc
+    const sortBy = searchParams.get('sortBy') || 'newest'; // newest | price_m2_asc | price_m2_desc | price_asc | price_desc
     const minPrice = searchParams.get('minPrice');
     const maxPrice = searchParams.get('maxPrice');
     const minSize = searchParams.get('minSize');
@@ -50,6 +50,16 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServerClient();
 
+    // Map sort key → (column, ascending). Unknown/empty defaults to newest-first.
+    const sortMap: Record<string, { col: string; asc: boolean }> = {
+      price_m2_asc:  { col: 'price_per_m2', asc: true },
+      price_m2_desc: { col: 'price_per_m2', asc: false },
+      price_asc:     { col: 'price',        asc: true },
+      price_desc:    { col: 'price',        asc: false },
+      newest:        { col: 'scraped_at',   asc: false },
+    };
+    const { col: sortCol, asc: sortAsc } = sortMap[sortBy] ?? sortMap.newest;
+
     // Build query
     let query = supabase
       .from('listings')
@@ -58,10 +68,7 @@ export async function GET(request: NextRequest) {
       .eq('offer_type', offerType)
       .not('lat', 'is', null)
       .not('lng', 'is', null)
-      .order(
-        sortBy === 'price_m2_asc' ? 'price_per_m2' : sortBy === 'price_asc' ? 'price' : 'scraped_at',
-        { ascending: sortBy !== 'newest' }
-      )
+      .order(sortCol, { ascending: sortAsc })
       .limit(limit);
 
     // Separate count query (same filters, no limit)

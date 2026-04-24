@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { morizonPhotoAtSize } from '@/lib/photoUrl';
 
 interface ListingDetailProps {
   listing: {
@@ -54,16 +55,9 @@ export default function ListingDetail({ listing, districtAvgPriceM2, districtNam
   }
 
   // Photos: use photos array if available, fall back to single thumbnail.
-  // Backfill fix for a scraper bug where Morizon photo URLs were stored
-  // without the size/filename suffix; the CDN responds with a 302 placeholder
-  // unless we append it. Safe to run on already-correct URLs.
-  const normalizeMorizonPhoto = (url: string): string => {
-    if (!url.startsWith('https://img1.staticmorizon.com.pl/thumb/')) return url;
-    if (url.includes(':fill_and_crop/') || url.endsWith('.jpg')) return url;
-    return `${url.replace(/\/$/, '')}/3x2_xs:fill_and_crop/image.jpg`;
-  };
+  // Modal shows photos large, so request the xl size variant from the CDN.
   const rawPhotos = listing.photos?.length ? listing.photos : (listing.thumbnailUrl ? [listing.thumbnailUrl] : []);
-  const photos = rawPhotos.map(normalizeMorizonPhoto);
+  const photos = rawPhotos.map((u) => morizonPhotoAtSize(u, 'xl'));
   const hasMultiplePhotos = photos.length > 1;
   const allPhotosFailed = photos.length > 0 && failedPhotos.size >= photos.length;
   const currentPhotoFailed = failedPhotos.has(photoIndex);
@@ -140,19 +134,23 @@ export default function ListingDetail({ listing, districtAvgPriceM2, districtNam
                 <div className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
                   <button
                     onClick={(e) => { e.stopPropagation(); setPhotoIndex(i => i > 0 ? i - 1 : photos.length - 1); }}
-                    className="pointer-events-auto w-8 h-8 flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                    className="pointer-events-auto w-9 h-9 flex items-center justify-center rounded bg-black/70 backdrop-blur-sm border border-[#00d4aa30] text-[#00d4aa] hover:bg-[#00d4aa] hover:text-black hover:border-[#00d4aa] transition-colors"
                     aria-label="Previous photo"
                   >
-                    <span className="font-mono text-sm leading-none">&lt;</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
                   </button>
                 </div>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                   <button
                     onClick={(e) => { e.stopPropagation(); setPhotoIndex(i => i < photos.length - 1 ? i + 1 : 0); }}
-                    className="pointer-events-auto w-8 h-8 flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                    className="pointer-events-auto w-9 h-9 flex items-center justify-center rounded bg-black/70 backdrop-blur-sm border border-[#00d4aa30] text-[#00d4aa] hover:bg-[#00d4aa] hover:text-black hover:border-[#00d4aa] transition-colors"
                     aria-label="Next photo"
                   >
-                    <span className="font-mono text-sm leading-none">&gt;</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </button>
                 </div>
               </>

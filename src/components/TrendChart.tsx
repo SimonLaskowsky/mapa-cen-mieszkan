@@ -70,7 +70,7 @@ export default function TrendChart({ city, district, offerType = 'sale', onClose
   // Chart dimensions
   const width = 210;
   const height = 120;
-  const padding = { top: 10, right: 10, bottom: 20, left: 45 };
+  const padding = { top: 10, right: 6, bottom: 20, left: 28 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -92,31 +92,51 @@ export default function TrendChart({ city, district, offerType = 'sale', onClose
 
   // Format helpers
   const formatPrice = (price: number) => `${(price / 1000).toFixed(0)}k`;
+  const formatPriceFull = (price: number) => new Intl.NumberFormat('pl-PL').format(Math.round(price));
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' });
   };
+  const formatMonth = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('pl-PL', { month: 'short' }).replace('.', '').toUpperCase();
+  };
 
   // Y axis ticks
   const yTicks = [minPrice, (minPrice + maxPrice) / 2, maxPrice];
+
+  // Find min/max data points for highlighting
+  const minIdx = prices.indexOf(Math.min(...prices));
+  const maxIdx = prices.indexOf(Math.max(...prices));
+  const lastIdx = data.length - 1;
+  const currentPrice = data[lastIdx].avgPriceM2;
 
   const trendColor = trend && trend.changePercent >= 0 ? '#ef4444' : '#22c55e';
   const trendIcon = trend && trend.changePercent >= 0 ? '▲' : '▼';
 
   const chartContent = (
     <>
-      {/* Trend summary */}
-      {trend && (
-        <div className="flex items-center gap-2 mb-3">
-          <span className="font-mono text-xs text-gray-400">6M CHANGE:</span>
-          <span className="font-mono text-sm" style={{ color: trendColor }}>
-            {trendIcon} {Math.abs(trend.changePercent).toFixed(1)}%
-          </span>
-          <span className="font-mono text-xs text-gray-500">
-            ({trend.changeAbsolute >= 0 ? '+' : ''}{trend.changeAbsolute.toFixed(0)} zł/m²)
-          </span>
+      {/* Trend summary — current price vs 6M change */}
+      <div className="px-2 mb-3 flex items-start justify-between gap-3">
+        <div>
+          <p className="font-mono text-[9px] text-gray-500 tracking-wider">CURRENT</p>
+          <p className="font-mono text-base text-white font-semibold leading-tight data-glow">
+            {formatPriceFull(currentPrice)}
+          </p>
+          <p className="font-mono text-[9px] text-gray-600 leading-tight">zł/m²</p>
         </div>
-      )}
+        {trend && (
+          <div className="text-right">
+            <p className="font-mono text-[9px] text-gray-500 tracking-wider">6M CHANGE</p>
+            <p className="font-mono text-base font-semibold leading-tight" style={{ color: trendColor }}>
+              {trendIcon} {Math.abs(trend.changePercent).toFixed(1)}%
+            </p>
+            <p className="font-mono text-[9px] leading-tight" style={{ color: trendColor, opacity: 0.7 }}>
+              {trend.changeAbsolute >= 0 ? '+' : ''}{trend.changeAbsolute.toFixed(0)} zł/m²
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* SVG Chart */}
       <svg width="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-hidden">
@@ -167,38 +187,75 @@ export default function TrendChart({ city, district, offerType = 'sale', onClose
           strokeLinejoin="round"
         />
 
-        {/* Data points */}
-        {points.map((p, i) => (
-          <circle
-            key={i}
-            cx={p.x}
-            cy={p.y}
-            r="3"
-            fill="#05080a"
-            stroke="#00d4aa"
-            strokeWidth="1.5"
-          />
-        ))}
+        {/* Data points — highlight min (green), max (red), latest (filled) */}
+        {points.map((p, i) => {
+          const isMin = i === minIdx;
+          const isMax = i === maxIdx;
+          const isLast = i === lastIdx;
+          const color = isMax ? '#ef4444' : isMin ? '#22c55e' : '#00d4aa';
+          return (
+            <g key={i}>
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={isLast ? 3.5 : 2.5}
+                fill={isLast ? color : '#05080a'}
+                stroke={color}
+                strokeWidth={isLast ? 2 : 1.5}
+              />
+              <title>{formatDate(p.data.date)} · {formatPriceFull(p.data.avgPriceM2)} zł/m²</title>
+            </g>
+          );
+        })}
 
-        {/* X axis labels */}
+        {/* Min/max value callouts */}
         <text
-          x={padding.left}
-          y={height - 2}
-          textAnchor="start"
-          className="fill-gray-500 font-mono"
-          fontSize="9"
+          x={points[maxIdx].x}
+          y={points[maxIdx].y - 5}
+          textAnchor={maxIdx === 0 ? 'start' : maxIdx === lastIdx ? 'end' : 'middle'}
+          fill="#ef4444"
+          fontSize="8"
+          className="font-mono"
+          fontWeight="600"
         >
-          {formatDate(data[0].date)}
+          {formatPrice(data[maxIdx].avgPriceM2)}
         </text>
         <text
-          x={width - padding.right}
-          y={height - 2}
-          textAnchor="end"
-          className="fill-gray-500 font-mono"
-          fontSize="9"
+          x={points[minIdx].x}
+          y={points[minIdx].y + 11}
+          textAnchor={minIdx === 0 ? 'start' : minIdx === lastIdx ? 'end' : 'middle'}
+          fill="#22c55e"
+          fontSize="8"
+          className="font-mono"
+          fontWeight="600"
         >
-          {formatDate(data[data.length - 1].date)}
+          {formatPrice(data[minIdx].avgPriceM2)}
         </text>
+
+        {/* X axis — month labels spread across */}
+        {(() => {
+          // pick ~4 evenly-spaced points and label them by month
+          const count = Math.min(4, data.length);
+          const step = data.length <= 1 ? 0 : (data.length - 1) / (count - 1);
+          return Array.from({ length: count }, (_, k) => {
+            const i = Math.round(k * step);
+            const p = points[i];
+            if (!p) return null;
+            const anchor = k === 0 ? 'start' : k === count - 1 ? 'end' : 'middle';
+            return (
+              <text
+                key={i}
+                x={p.x}
+                y={height - 2}
+                textAnchor={anchor}
+                className="fill-gray-500 font-mono"
+                fontSize="8"
+              >
+                {formatMonth(p.data.date)}
+              </text>
+            );
+          });
+        })()}
       </svg>
 
       {/* Footer */}
